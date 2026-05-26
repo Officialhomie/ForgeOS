@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAccount, useDisconnect, useChainId, useSwitchChain } from 'wagmi'
 import { useForgeWalletConnect } from '@/hooks/useForgeWalletConnect'
-import { createWalletClient, custom } from 'viem'
+import { createClient, custom } from 'viem'
 import { erc7715ProviderActions } from '@metamask/smart-accounts-kit/actions'
 import { isDemoMode } from '@/lib/demo'
 import { CONTRACTS } from '@/lib/contracts'
@@ -20,7 +20,15 @@ import {
 } from '@/lib/activation/storage'
 import { forgeChain } from '@/lib/wagmi/chains'
 import { ensureForgeChain } from '@/lib/wagmi/ensure-forge-chain'
-import { formatWalletError } from '@/lib/wagmi/ethereum-provider'
+import {
+  formatErc7715Error,
+  formatWalletError,
+  getErc7715Provider,
+  getEthereumProviderDiagnostics,
+  hasEthereumProvider,
+  probeErc7715RpcSupport,
+  refreshWalletRuntimeCache,
+} from '@/lib/wagmi/ethereum-provider'
 import { MOCK_DELEGATIONS } from '@/lib/mock-data'
 import { useOsStore } from '@/stores/os.store'
 import { useDelegationsStore } from '@/stores/delegations.store'
@@ -308,6 +316,27 @@ export function useActivation() {
     setActivationStep,
   ])
 
+  const completePermissionsDemo = useCallback(async () => {
+    const root = MOCK_DELEGATIONS.root
+    setRootDelegation(root)
+    setDelegations([root])
+    markComplete('permissions')
+    setPhase('idle')
+    setActivationStep(3)
+    persist({
+      phase: 'idle',
+      completedSteps: [...completedSteps, 'permissions'],
+      delegationHash: root.hash,
+    })
+  }, [
+    markComplete,
+    persist,
+    completedSteps,
+    setRootDelegation,
+    setDelegations,
+    setActivationStep,
+  ])
+
   const requestPermissions = useCallback(async () => {
     setError(null)
     setPhase('requesting_permissions')
@@ -318,33 +347,44 @@ export function useActivation() {
       }
       if (demo) {
         await sleep(1500)
-        const root = MOCK_DELEGATIONS.root
-        setRootDelegation(root)
-        setDelegations([root])
-        markComplete('permissions')
-        setPhase('idle')
-        setActivationStep(3)
-        persist({
-          phase: 'idle',
-          completedSteps: [...completedSteps, 'permissions'],
-          delegationHash: root.hash,
-        })
+        await completePermissionsDemo()
         return
       }
 
-      if (typeof window === 'undefined' || !window.ethereum) {
+      if (!hasEthereumProvider()) {
         throw new Error('MetaMask not available')
       }
 
-      const walletClient = createWalletClient({
+      await refreshWalletRuntimeCache()
+      const diag = getEthereumProviderDiagnostics()
+      if (diag.hasFlaskCandidate && diag.hasStandardMetaMaskCandidate) {
+        throw new Error(
+          'Dual MetaMask extensions detected. Disable regular MetaMask, keep only Flask, hard-refresh, reconnect.',
+        )
+      }
+      if (diag.kind === 'metamask' && !diag.hasFlaskCandidate) {
+        throw new Error(
+          'Connected to standard MetaMask, not Flask. Disable standard MetaMask and reconnect with Flask only.',
+        )
+      }
+
+      const provider = await getErc7715Provider()
+      if (!provider) throw new Error('MetaMask not available')
+
+      const rpcOk = await probeErc7715RpcSupport(provider)
+      if (!rpcOk) {
+        throw new Error(
+          'wallet_getSupportedExecutionPermissions is not available on this MetaMask Flask build. Use “Continue with demo delegation” or install a Flask version with ERC-7715 enabled.',
+        )
+      }
+
+      const erc7715Client = createClient({
         chain: forgeChain,
-        transport: custom(window.ethereum),
+        transport: custom(provider),
       }).extend(erc7715ProviderActions())
 
       const permissions = buildActivationPermissions(CONTRACTS.osKernel)
-      const granted = await walletClient.requestExecutionPermissions(
-        permissions,
-      )
+      const granted = await erc7715Client.requestExecutionPermissions(permissions)
 
       const delegator = (smartAccountAddress ?? address) as Address
       const kitDel = await createRootDelegationStruct({ delegator })
@@ -383,18 +423,10 @@ export function useActivation() {
       })
     } catch (e) {
       setPhase('error')
-      const raw = e instanceof Error ? e.message : String(e)
-      const isMethodMissing =
-        raw.includes('wallet_requestExecutionPermissions') ||
-        raw.includes('does not exist') ||
-        raw.includes('is not available') ||
-        raw.includes('no handler') ||
-        raw.includes('doesn\'t has corresponding handler')
-      setError(
-        isMethodMissing
-          ? 'MetaMask Flask required. Your MetaMask version does not support wallet_requestExecutionPermissions (ERC-7715). Install MetaMask Flask (developer build) at flask.metamask.io, switch to Sepolia, then retry. Use NEXT_PUBLIC_DEMO_MODE=true to skip this step in demo mode.'
-          : raw,
-      )
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[ForgeOS] ERC-7715 request failed', e)
+      }
+      setError(formatErc7715Error(e))
     }
   }, [
     address,
@@ -408,7 +440,20 @@ export function useActivation() {
     setDelegations,
     setActivationStep,
     switchChainAsync,
+    completePermissionsDemo,
   ])
+
+  const requestPermissionsDemo = useCallback(async () => {
+    setError(null)
+    setPhase('requesting_permissions')
+    try {
+      await sleep(800)
+      await completePermissionsDemo()
+    } catch (e) {
+      setPhase('error')
+      setError(e instanceof Error ? e.message : 'Demo delegation failed')
+    }
+  }, [completePermissionsDemo])
 
   const finishActivation = useCallback(
     (tx?: Hash) => {
@@ -579,6 +624,7 @@ export function useActivation() {
     connectWallet,
     deploySmartAccount,
     requestPermissions,
+    requestPermissionsDemo,
     fundTreasury,
     loadPredictedAddress,
     skipDemoActivation,

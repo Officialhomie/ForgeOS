@@ -13,11 +13,15 @@ import { useActivationContext } from '@/providers/ActivationProvider'
 import { CONTRACTS } from '@/lib/contracts'
 import { DEFAULT_POLICY_PREVIEW } from '@/types/activation'
 import { KeyRound, Shield, Wallet } from 'lucide-react'
+import { WalletProviderNotice } from '@/components/activation/WalletProviderNotice'
+import { useWalletRuntimeDiagnostics } from '@/hooks/useWalletRuntimeDiagnostics'
+import { useErc7715Support } from '@/hooks/useErc7715Support'
 
 export function StepThree_Delegate() {
   const {
     canProceed,
     requestPermissions,
+    requestPermissionsDemo,
     phase,
     error,
     isSepolia,
@@ -28,6 +32,10 @@ export function StepThree_Delegate() {
   const gated = !canProceed('permissions')
   const busy = phase === 'requesting_permissions'
   const walletDisconnected = !isConnected
+  const { conflict: walletConflict, ready: walletDiagReady } =
+    useWalletRuntimeDiagnostics()
+  const { ready: erc7715Ready, rpcAvailable: erc7715RpcAvailable } =
+    useErc7715Support()
 
   return (
     <Card className="border-forge-border-subtle bg-forge-surface/80">
@@ -106,6 +114,20 @@ export function StepThree_Delegate() {
           </ul>
         </div>
 
+        <WalletProviderNotice />
+
+        {erc7715Ready && !erc7715RpcAvailable && (
+          <div className="rounded-lg border border-forge-warning/40 bg-forge-warning/10 px-3 py-2.5 text-xs text-forge-warning">
+            <p className="font-semibold">ERC-7715 RPC not available in this Flask build</p>
+            <p className="mt-1">
+              Flask is detected, but{' '}
+              <span className="font-mono">wallet_requestExecutionPermissions</span> is not
+              exposed. Use demo delegation below to continue activation, or try an older
+              Flask build with ERC-7715 enabled.
+            </p>
+          </div>
+        )}
+
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/8 px-3 py-2.5 text-xs text-amber-300">
           <span className="font-semibold">Requires MetaMask Flask.</span>{' '}
           Standard MetaMask does not support{' '}
@@ -130,12 +152,29 @@ export function StepThree_Delegate() {
           Revoke anytime from the dashboard — one click kills all agents atomically.
         </p>
 
-        <Button
-          onClick={() => void requestPermissions()}
-          disabled={gated || busy || walletDisconnected}
-        >
-          {busy ? 'Waiting for MetaMask…' : 'Request ERC-7715 permissions'}
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <Button
+            onClick={() => void requestPermissions()}
+            disabled={
+              gated ||
+              busy ||
+              walletDisconnected ||
+              (walletDiagReady && walletConflict) ||
+              (erc7715Ready && !erc7715RpcAvailable)
+            }
+          >
+            {busy ? 'Waiting for MetaMask…' : 'Request ERC-7715 permissions'}
+          </Button>
+          {erc7715Ready && !erc7715RpcAvailable && (
+            <Button
+              variant="outline"
+              disabled={gated || busy || walletDisconnected}
+              onClick={() => void requestPermissionsDemo()}
+            >
+              Continue with demo delegation
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   )

@@ -1,0 +1,41 @@
+import { NextResponse } from 'next/server'
+import { ONESHOT } from '@/lib/constants'
+import { isDemoMode } from '@/lib/demo'
+import { send7710Transaction } from '@/lib/oneshot/client'
+
+export async function POST(request: Request) {
+  try {
+    const body = (await request.json()) as {
+      chainId?: number
+      amountUsdc?: string
+      treasuryAddress?: string
+    }
+
+    if (isDemoMode() || !process.env.ONESHOT_API_KEY) {
+      return NextResponse.json({
+        taskId: `demo-fund-${Date.now()}`,
+        txHash:
+          '0xFUND00000000000000000000000000000000000000000000000000000000001',
+        status: 'confirmed',
+        amountUsdc: body.amountUsdc,
+      })
+    }
+
+    const chainId = body.chainId ?? ONESHOT.CHAIN_ID
+    const { taskId } = await send7710Transaction({
+      chainId,
+      userOps: [
+        {
+          treasury: body.treasuryAddress,
+          amount: body.amountUsdc,
+        },
+      ],
+      destinationUrl: process.env.ONESHOT_WEBHOOK_URL,
+    })
+
+    return NextResponse.json({ taskId, status: 'submitted' })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Relay fund failed'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}

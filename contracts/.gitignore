@@ -1,0 +1,11 @@
+# Foundry artifacts
+out/
+cache/
+broadcast/
+
+# environment
+.env
+.env.local
+
+# misc
+.DS_Store

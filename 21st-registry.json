@@ -1,0 +1,12 @@
+[
+  {
+    "name": "progress",
+    "sourceType": "direct_name",
+    "addedByCLI": true
+  },
+  {
+    "name": "card",
+    "sourceType": "direct_name",
+    "addedByCLI": true
+  }
+]

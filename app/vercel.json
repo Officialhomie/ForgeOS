@@ -1,6 +1,8 @@
 {
-  "framework": "nextjs",
-  "installCommand": "pnpm install",
-  "buildCommand": "pnpm build",
-  "outputDirectory": ".next"
+  "crons": [
+    {
+      "path": "/api/cron/agent-runner",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }

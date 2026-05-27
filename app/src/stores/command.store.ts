@@ -11,6 +11,7 @@ const initialCommand: CommandState = {
   runId: null,
   oneShotTaskId: null,
   error: null,
+  timing: null,
 }
 
 interface CommandStore {

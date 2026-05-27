@@ -21,7 +21,6 @@ export function StepThree_Delegate() {
   const {
     canProceed,
     requestPermissions,
-    requestPermissionsDemo,
     phase,
     error,
     isSepolia,
@@ -44,11 +43,11 @@ export function StepThree_Delegate() {
           <KeyRound className="size-5" />
         </div>
         <CardTitle className="font-[family-name:var(--font-display)] text-xl">
-          Sign master delegation
+          Set agent permissions
         </CardTitle>
         <CardDescription>
-          One ERC-7715 permission request via MetaMask Flask. Caveats are enforced
-          on-chain by the OS kernel on Ethereum Sepolia.
+          Choose what your agents are allowed to do. You stay in control — agents can only
+          act within the limits you approve here.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -73,28 +72,26 @@ export function StepThree_Delegate() {
 
         {!isSepolia && !walletDisconnected && (
           <p className="rounded-lg border border-forge-danger/40 bg-forge-danger/10 px-3 py-2 text-xs text-forge-danger">
-            Switch to Ethereum Sepolia (chain 11155111) in MetaMask. ERC-7715
-            permissions require Ethereum Sepolia — MetaMask Flask does not support
-            this on Base Sepolia.
+            Please switch to Ethereum Sepolia in MetaMask before continuing. Agent permissions are only supported on Sepolia.
           </p>
         )}
 
         <div className="space-y-3 rounded-lg border border-forge-border-subtle bg-forge-bg/60 p-4">
           <div className="flex items-center gap-2 text-xs font-medium text-forge-text-muted">
             <Shield className="size-3.5 text-forge-orange" />
-            Delegation preview
+            What you are approving
           </div>
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-forge-text-muted">Delegate</dt>
+              <dt className="text-forge-text-muted">Managed by</dt>
               <dd className="flex flex-col items-end gap-0.5">
-                <span className="text-xs font-medium text-forge-orange">OSKernel</span>
+                <span className="text-xs font-medium text-forge-orange">ForgeOS</span>
                 <AddressDisplay address={CONTRACTS.osKernel} />
               </dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-forge-text-muted">Authority</dt>
-              <dd className="font-mono text-forge-mono">ROOT</dd>
+              <dt className="text-forge-text-muted">Access level</dt>
+              <dd className="text-forge-text">Full (you can revoke anytime)</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-forge-text-muted">Monthly cap</dt>
@@ -118,20 +115,16 @@ export function StepThree_Delegate() {
 
         {erc7715Ready && !erc7715RpcAvailable && (
           <div className="rounded-lg border border-forge-warning/40 bg-forge-warning/10 px-3 py-2.5 text-xs text-forge-warning">
-            <p className="font-semibold">ERC-7715 RPC not available in this Flask build</p>
+            <p className="font-semibold">Your MetaMask Flask version is out of date</p>
             <p className="mt-1">
-              Flask is detected, but{' '}
-              <span className="font-mono">wallet_requestExecutionPermissions</span> is not
-              exposed. Use demo delegation below to continue activation, or try an older
-              Flask build with ERC-7715 enabled.
+              Flask was detected, but agent permissions are not available in this version. Please update MetaMask Flask and try again.
             </p>
           </div>
         )}
 
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/8 px-3 py-2.5 text-xs text-amber-300">
-          <span className="font-semibold">Requires MetaMask Flask.</span>{' '}
-          Standard MetaMask does not support{' '}
-          <span className="font-mono">wallet_requestExecutionPermissions</span> (ERC-7715).
+          <span className="font-semibold">Requires MetaMask Flask (developer edition).</span>{' '}
+          The standard MetaMask app does not yet support agent permissions.
           Install Flask at{' '}
           <a
             href="https://metamask.io/flask/"
@@ -141,7 +134,7 @@ export function StepThree_Delegate() {
           >
             metamask.io/flask
           </a>
-          {' '}and switch to Sepolia. For judges: run in demo mode.
+          {' '}and switch to Sepolia to continue.
         </div>
 
         {error && phase === 'error' && (
@@ -149,7 +142,7 @@ export function StepThree_Delegate() {
         )}
 
         <p className="text-xs text-forge-text-subtle">
-          Revoke anytime from the dashboard — one click kills all agents atomically.
+          You can revoke this from the dashboard at any time — one click stops all your agents immediately.
         </p>
 
         <div className="flex flex-wrap gap-3">
@@ -163,17 +156,8 @@ export function StepThree_Delegate() {
               (erc7715Ready && !erc7715RpcAvailable)
             }
           >
-            {busy ? 'Waiting for MetaMask…' : 'Request ERC-7715 permissions'}
+            {busy ? 'Waiting for MetaMask…' : 'Approve agent permissions'}
           </Button>
-          {erc7715Ready && !erc7715RpcAvailable && (
-            <Button
-              variant="outline"
-              disabled={gated || busy || walletDisconnected}
-              onClick={() => void requestPermissionsDemo()}
-            >
-              Continue with demo delegation
-            </Button>
-          )}
         </div>
       </CardContent>
     </Card>

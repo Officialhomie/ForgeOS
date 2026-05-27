@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { ONESHOT } from '@/lib/constants'
-import { isDemoMode } from '@/lib/demo'
 import { send7710Transaction } from '@/lib/oneshot/client'
 
 export async function POST(request: Request) {
@@ -9,15 +8,8 @@ export async function POST(request: Request) {
       chainId?: number
       smartAccountAddress?: string
     }
-
-    if (isDemoMode() || !process.env.ONESHOT_API_KEY) {
-      return NextResponse.json({
-        taskId: `demo-deploy-${Date.now()}`,
-        txHash:
-          '0xDEPLOY000000000000000000000000000000000000000000000000000000001',
-        status: 'confirmed',
-        smartAccountAddress: body.smartAccountAddress,
-      })
+    if (!process.env.ONESHOT_API_KEY) {
+      return NextResponse.json({ error: 'ONESHOT_API_KEY not configured' }, { status: 503 })
     }
 
     const chainId = body.chainId ?? ONESHOT.CHAIN_ID

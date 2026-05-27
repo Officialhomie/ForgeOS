@@ -8,14 +8,12 @@ import { AddressDisplay } from '@/components/ui/AddressDisplay'
 import { Button } from '@/components/ui/Button'
 import { NetworkIndicator } from '@/components/ui/NetworkIndicator'
 import { KillSwitchModal } from '@/components/KillSwitchModal'
-import { isDemoMode } from '@/lib/demo'
 import { useCommandStore } from '@/stores/command.store'
 
 export function TopBar() {
   const { address, isConnected } = useAccount()
   const { connectWallet, isPending, error: connectError } = useForgeWalletConnect()
   const { disconnect } = useDisconnect()
-  const demo = isDemoMode()
   const openCommand = useCommandStore((s) => s.setOpen)
   const [killSwitchOpen, setKillSwitchOpen] = useState(false)
   const [localConnectError, setLocalConnectError] = useState<string | null>(null)
@@ -40,9 +38,7 @@ export function TopBar() {
           >
             Kill Switch
           </Button>
-          {demo ? (
-            <AddressDisplay address="0xUser0SmartAccount00000000000000000000000" />
-          ) : isConnected && address ? (
+          {isConnected && address ? (
             <>
               <AddressDisplay address={address} />
               <Button variant="ghost" onClick={() => disconnect()}>

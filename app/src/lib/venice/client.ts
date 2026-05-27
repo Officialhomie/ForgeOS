@@ -11,8 +11,9 @@
  *      include X-Payment receipt header, retry.
  */
 
-import { createWalletClient, http, type Hex, type Address } from 'viem'
+import { createWalletClient, http, type Hex, type Address, type LocalAccount } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
+import { hasTurnkeyConfig, createTurnkeyAccount } from '@/lib/venice/turnkey-signer'
 import { veniceChain } from '@/lib/wagmi/chains'
 import { VENICE_CHAIN_ID } from '@/lib/chains/network'
 import { VENICE } from '@/lib/constants'
@@ -84,13 +85,13 @@ export class VenicePaymentRequired extends Error {
 // ─── VENICE CLIENT ────────────────────────────────────────────────────────────
 
 export class VeniceClient {
-  private readonly account: ReturnType<typeof privateKeyToAccount>
+  private readonly account: LocalAccount
   private readonly walletClient: ReturnType<typeof createWalletClient>
   private readonly baseUrl: string
   private siweCache: { token: string; expiresAt: number } | null = null
 
-  constructor(walletKey: string) {
-    this.account = privateKeyToAccount(walletKey as Hex)
+  constructor(account: LocalAccount) {
+    this.account = account
     this.walletClient = createWalletClient({
       account: this.account,
       chain: veniceChain,
@@ -126,7 +127,23 @@ export class VeniceClient {
       `Expiration Time: ${expirationTime.toISOString()}`,
     ].join('\n')
 
-    const signature = await this.account.signMessage({ message })
+    let signature: `0x${string}`
+    try {
+      signature = await this.account.signMessage({ message })
+    } catch (e) {
+      // Reset the singleton so the next request rebuilds the client (e.g. refreshed Turnkey creds)
+      _clientPromise = null
+      const raw = e instanceof Error ? e.message : String(e)
+      const isFetchError = raw.includes('fetch failed') || raw.includes('Failed to sign')
+      throw new Error(
+        isFetchError
+          ? `Agent wallet signing failed — network error reaching the signing service. ` +
+            `If you are using Turnkey, check your API credentials. ` +
+            `For local dev, set AGENT_WALLET_KEY=0x<privateKey> in .env.local as a fallback. ` +
+            `(Raw: ${raw})`
+          : `Agent wallet signing failed: ${raw}`,
+      )
+    }
 
     this.siweCache = {
       token: `${message}\n${signature}`,
@@ -367,13 +384,47 @@ function parseActionPlan(content: string, intent: string, model: string): Action
 
 // ─── SINGLETON ────────────────────────────────────────────────────────────────
 
-let _client: VeniceClient | null = null
+// Promise-based singleton: safe against concurrent initialization on cold start.
+// Cleared on failure so the next request can retry (transient network errors, etc.)
+let _clientPromise: Promise<VeniceClient> | null = null
 
-export function getVeniceClient(): VeniceClient {
-  if (!_client) {
-    const key = process.env.AGENT_WALLET_KEY
-    if (!key) throw new Error('AGENT_WALLET_KEY not set')
-    _client = new VeniceClient(key)
+export function getVeniceClient(): Promise<VeniceClient> {
+  if (!_clientPromise) {
+    _clientPromise = _buildClient()
+    // Auto-clear on rejection so the next call can retry instead of re-throwing forever
+    _clientPromise.catch(() => { _clientPromise = null })
   }
-  return _client
+  return _clientPromise
+}
+
+async function _buildClient(): Promise<VeniceClient> {
+  // ① Prefer Turnkey HSM when fully configured
+  if (hasTurnkeyConfig()) {
+    try {
+      const address = process.env.TURNKEY_WALLET_ADDRESS as Address
+      const account = await createTurnkeyAccount(address)
+      return new VeniceClient(account as LocalAccount)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error(`[ForgeOS] Turnkey account creation failed: ${msg}`)
+      // Fall through to local-key fallback
+    }
+  }
+
+  // ② Raw private key (dev / non-HSM deployments)
+  const key = process.env.AGENT_WALLET_KEY
+  if (key) {
+    return new VeniceClient(privateKeyToAccount(key as Hex))
+  }
+
+  throw new Error(
+    'Agent wallet not configured. ' +
+    'Set AGENT_WALLET_KEY=0x<privateKey> in .env.local for local dev, ' +
+    'or ensure all five TURNKEY_* vars are valid.',
+  )
+}
+
+/** True if the agent wallet is configured via either path. */
+export function hasAgentWallet(): boolean {
+  return hasTurnkeyConfig() || !!process.env.AGENT_WALLET_KEY
 }

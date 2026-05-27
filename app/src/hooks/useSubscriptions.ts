@@ -1,20 +1,6 @@
-/**
- * P9.4 — useSubscriptions hook
- *
- * Reads active subscriptions and exposes cycle progress.
- * Demo mode: MOCK_SUBSCRIPTIONS. Live mode: fetches from API (future).
- *
- * Computes:
- *  - cyclesUsed / cyclesTotal for progress bar
- *  - formatted next payment time
- *  - subscription duration from TimestampEnforcer caveats
- */
-
 'use client'
 
 import { useMemo } from 'react'
-import { isDemoMode } from '@/lib/demo'
-import { MOCK_SUBSCRIPTIONS } from '@/lib/mock-data'
 import type { Subscription } from '@/types'
 
 // ─── DERIVED TYPES ────────────────────────────────────────────────────────────
@@ -34,7 +20,7 @@ export function useSubscriptions(): {
   subscriptions: SubscriptionDisplay[]
   isLoading: boolean
 } {
-  const raw: Subscription[] = isDemoMode() ? MOCK_SUBSCRIPTIONS : []
+  const raw: Subscription[] = []
 
   const subscriptions = useMemo(
     () => raw.map(toDisplay),

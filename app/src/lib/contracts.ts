@@ -17,15 +17,15 @@ const DEFAULT_USDC_BASE_MAINNET =
 export const CONTRACTS = {
   osKernel: envAddress(
     'NEXT_PUBLIC_OS_KERNEL_ADDRESS',
-    '0x3E65dD7AB6BeF1Ffe5CaC683D401621b400988aB' as Address,
+    '0xcFC6BECB0054D6e313a88c70CcE1d477D8752382' as Address,
   ),
   agentTreasury: envAddress(
     'NEXT_PUBLIC_AGENT_TREASURY_ADDRESS',
-    '0xAfdA3dCf4BF42cF9C69bB14BAe262ACd5c75C2D1' as Address,
+    '0xe0DD408BE8cb3Dfe6441FEfE1e209E886F48071A' as Address,
   ),
   registry: envAddress(
     'NEXT_PUBLIC_REGISTRY_ADDRESS',
-    '0xB4FE452e905Cc5BF7C02d57f32fd3fFB3Ca5Ab6a' as Address,
+    '0x4668B4Dd600FB4404783a9C73B6b4fcb71e78347' as Address,
   ),
   /** USDC on primary Forge chain (Ethereum Sepolia by default). */
   usdc: envAddress('NEXT_PUBLIC_USDC_ADDRESS', DEFAULT_USDC_ETH_SEPOLIA),

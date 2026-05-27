@@ -1,24 +1,17 @@
 /**
- * POST /api/relay/revoke-all
- *
- * Encodes OSKernel.revokeAll() and submits via 1Shot relay.
- * Returns taskId immediately; confirmation arrives via webhook.
- *
- * Track evidence:
- *  - Best Agent: atomic kill switch, safety UX
- *  - Best 1Shot: webhook callback (not polling)
+ * POST /api/relay/revoke-all — OSKernel.revokeAll() via 1Shot.
  */
 
 import { NextResponse } from 'next/server'
 import { encodeFunctionData } from 'viem'
-import { isDemoMode } from '@/lib/demo'
 import { send7710Transaction } from '@/lib/oneshot/client'
 import { taskStore } from '@/lib/oneshot/task-store'
 import { activityEmitter } from '@/lib/events/activity-emitter'
+import { registerKillSwitchTask } from '@/lib/kill-switch/registry'
 import { APP_URL, ONESHOT } from '@/lib/constants'
-import type { ActivityEvent, Hash } from '@/types'
+import { CONTRACTS } from '@/lib/contracts'
+import type { ActivityEvent, Delegation } from '@/types'
 
-// Minimal ABI — only revokeAll() needed
 const OS_KERNEL_ABI = [
   {
     name: 'revokeAll',
@@ -29,40 +22,20 @@ const OS_KERNEL_ABI = [
   },
 ] as const
 
-export async function POST() {
-  // ── Demo mode ──────────────────────────────────────────────────────────────
-  if (isDemoMode() || !process.env.ONESHOT_API_KEY) {
-    const taskId = `demo-revoke-all-${Date.now()}`
-    const mockTxHash = `0xKILL${Date.now().toString(16).padStart(60, '0')}` as Hash
-
-    taskStore.create(taskId)
-    taskStore.update(taskId, 'Confirmed', mockTxHash)
-
-    const event: ActivityEvent = {
-      id: `kill_switch_${taskId}`,
-      type: 'os_revoked',
-      agentId: null,
-      title: 'All delegations revoked (demo)',
-      description: 'OSKernel.revokeAll() — AllDelegationsRevoked event emitted',
-      amount: null,
-      txHash: mockTxHash,
-      delegationHash: null,
-      timestamp: Math.floor(Date.now() / 1000),
-      status: 'confirmed',
-    }
-    activityEmitter.emitActivity(event)
-
-    return NextResponse.json({ success: true, taskId })
+export async function POST(request: Request) {
+  if (!process.env.ONESHOT_API_KEY) {
+    return NextResponse.json({ success: false, error: 'ONESHOT_API_KEY not configured' }, { status: 503 })
   }
 
-  // ── Live mode ──────────────────────────────────────────────────────────────
-  const kernelAddress = process.env.OS_KERNEL_ADDRESS as `0x${string}` | undefined
-  if (!kernelAddress) {
-    return NextResponse.json(
-      { success: false, error: 'OS_KERNEL_ADDRESS not configured' },
-      { status: 503 },
-    )
+  let delegations: Delegation[] = []
+  try {
+    const body = (await request.json()) as { delegations?: Delegation[] }
+    delegations = body.delegations ?? []
+  } catch {
+    // empty body ok
   }
+
+  const kernelAddress = CONTRACTS.osKernel
 
   try {
     const callData = encodeFunctionData({
@@ -87,16 +60,20 @@ export async function POST() {
     })
 
     taskStore.create(taskId)
+    if (delegations.length > 0) {
+      registerKillSwitchTask(taskId, delegations)
+    }
 
     const pendingEvent: ActivityEvent = {
       id: `kill_switch_${taskId}`,
       type: 'os_revoked',
       agentId: null,
       title: 'Kill switch activated',
-      description: `OSKernel.revokeAll() submitted — taskId: ${taskId}`,
+      description: `OSKernel.revokeAll() submitted`,
       amount: null,
       txHash: null,
       delegationHash: null,
+      taskId,
       timestamp: Math.floor(Date.now() / 1000),
       status: 'pending',
     }

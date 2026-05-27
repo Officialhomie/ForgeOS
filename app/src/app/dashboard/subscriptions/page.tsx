@@ -1,8 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { useAccount } from 'wagmi'
 import { cn, formatUsdc, truncateAddress, formatDate, timeAgo } from '@/lib/utils'
 import { useSubscriptions, type SubscriptionDisplay } from '@/hooks/useSubscriptions'
+import { useOsStore } from '@/stores/os.store'
+import { CONTRACTS } from '@/lib/contracts'
 import { EmptyState } from '@/components/ui/EmptyState'
 import type { CreateSubscriptionParams } from '@/types'
 
@@ -142,6 +145,9 @@ function SubscriptionCard({
 // ─── CREATE FORM ──────────────────────────────────────────────────────────────
 
 function CreateSubscriptionForm({ onClose }: { onClose: () => void }) {
+  const { address } = useAccount()
+  const rootDelegation = useOsStore((s) => s.rootDelegation)
+
   const [fields, setFields] = useState<CreateSubscriptionParams>({
     name: '',
     description: '',
@@ -151,6 +157,7 @@ function CreateSubscriptionForm({ onClose }: { onClose: () => void }) {
     maxPayments: 12,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   function handleChange(key: keyof CreateSubscriptionParams, value: string | number | bigint) {
     setFields((prev) => ({ ...prev, [key]: value }))
@@ -158,9 +165,14 @@ function CreateSubscriptionForm({ onClose }: { onClose: () => void }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!address || !rootDelegation) {
+      setSubmitError('Wallet not connected or activation not complete.')
+      return
+    }
     setIsSubmitting(true)
+    setSubmitError(null)
     try {
-      await fetch('/api/subscriptions/create', {
+      const res = await fetch('/api/subscriptions/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -168,15 +180,18 @@ function CreateSubscriptionForm({ onClose }: { onClose: () => void }) {
           amount: fields.amount.toString(),
           durationSeconds: fields.frequencySeconds * fields.maxPayments,
           maxPayments: fields.maxPayments,
-          // Demo placeholders — in live mode these come from the connected wallet
-          parentDelegationHash: '0x0000000000000000000000000000000000000000000000000000000000000001',
-          delegatorAddress: '0x0000000000000000000000000000000000000001',
-          delegateAddress: '0x0000000000000000000000000000000000000002',
+          parentDelegationHash: rootDelegation.hash,
+          delegatorAddress: address,
+          delegateAddress: CONTRACTS.osKernel,
         }),
       })
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string }
+        throw new Error(data.error ?? 'Failed to create subscription')
+      }
       onClose()
-    } catch {
-      // silently handled — demo mode always succeeds
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to create subscription')
     } finally {
       setIsSubmitting(false)
     }
@@ -236,10 +251,16 @@ function CreateSubscriptionForm({ onClose }: { onClose: () => void }) {
           LimitedCallsEnforcer. No new signature required per cycle.
         </p>
 
+        {submitError && (
+          <p className="rounded-lg bg-forge-danger/10 px-3 py-2 text-xs text-forge-danger">
+            {submitError}
+          </p>
+        )}
+
         <div className="flex gap-2">
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !address || !rootDelegation}
             className="flex-1 rounded-lg bg-forge-orange py-2 text-sm font-semibold text-black transition-opacity disabled:opacity-50"
           >
             {isSubmitting ? 'Creating…' : 'Create Subscription'}

@@ -21,7 +21,7 @@ const STEP_COMPONENTS: Record<
 }
 
 function ActivationWizardInner() {
-  const { steps, progressPercent, currentStep, phase, demo, goBack } =
+  const { steps, progressPercent, currentStep, phase, goBack } =
     useActivationContext()
 
   const canGoBack =
@@ -29,8 +29,7 @@ function ActivationWizardInner() {
     currentStep !== 'complete' &&
     phase !== 'active' &&
     phase !== 'deploying' &&
-    phase !== 'requesting_permissions' &&
-    phase !== 'funding'
+    phase !== 'requesting_permissions'
 
   const ActiveStep =
     currentStep === 'complete'
@@ -56,11 +55,6 @@ function ActivationWizardInner() {
           <Link href="/" className="font-[family-name:var(--font-display)] text-lg font-bold tracking-wide text-forge-orange">
             ForgeOS
           </Link>
-          {demo && (
-            <span className="rounded-full border border-forge-orange/40 bg-forge-orange/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-forge-orange">
-              Demo mode
-            </span>
-          )}
         </div>
       </header>
 
@@ -70,7 +64,7 @@ function ActivationWizardInner() {
             Activate your agent OS
           </h1>
           <p className="mt-2 text-sm text-forge-text-muted">
-            One approval. Scoped delegations. Gasless deploy. Private Venice inference.
+            Set up in 4 steps. Your agents work for you — safely, within limits you control.
           </p>
         </div>
 

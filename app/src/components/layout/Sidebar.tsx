@@ -5,9 +5,12 @@ import { usePathname } from 'next/navigation'
 import {
   Bot,
   GitBranch,
+  Hammer,
   LayoutDashboard,
   Repeat,
+  ShoppingBag,
   Wallet,
+  Activity,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { NAV_ITEMS } from '@/lib/constants'
@@ -17,8 +20,11 @@ const ICONS = {
   LayoutDashboard,
   Bot,
   GitBranch,
+  Hammer,
+  Store: ShoppingBag,
   Wallet,
   Repeat,
+  Activity,
 } as const
 
 export function Sidebar() {

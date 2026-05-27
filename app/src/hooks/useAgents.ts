@@ -2,13 +2,11 @@
 
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { isDemoMode } from '@/lib/demo'
 import { GRAPH_POLL_MS, isGraphEnabled } from '@/lib/graph/config'
 import { queryGraph } from '@/lib/graph/client'
 import { mapGraphAgent } from '@/lib/graph/mappers'
 import { GET_AGENTS } from '@/lib/graph/queries'
 import type { GraphAgent } from '@/lib/graph/types'
-import { MOCK_AGENTS } from '@/lib/mock-data'
 import { useAgentsStore } from '@/stores/agents.store'
 import type { Agent, AgentId } from '@/types'
 
@@ -26,8 +24,7 @@ export function useAgents(): {
   const setAgents = useAgentsStore((s) => s.setAgents)
   const setLoading = useAgentsStore((s) => s.setLoading)
 
-  const demo = isDemoMode()
-  const graphOn = isGraphEnabled() && !demo
+  const graphOn = isGraphEnabled()
 
   const query = useQuery({
     queryKey: ['agents', 'graph'],
@@ -44,13 +41,7 @@ export function useAgents(): {
   })
 
   useEffect(() => {
-    if (demo) {
-      setAgents(MOCK_AGENTS)
-      setLoading(false)
-      return
-    }
     if (!graphOn) {
-      setAgents(MOCK_AGENTS)
       setLoading(false)
       return
     }
@@ -58,11 +49,11 @@ export function useAgents(): {
     if (query.data) {
       setAgents(query.data)
     }
-  }, [demo, graphOn, query.isLoading, query.data, setAgents, setLoading])
+  }, [graphOn, query.isLoading, query.data, setAgents, setLoading])
 
   return {
     agents: Object.values(agents) as Agent[],
-    loading: demo ? false : loading,
+    loading,
     error: query.isError
       ? query.error instanceof Error
         ? query.error.message

@@ -10,8 +10,6 @@ import { TokenAmount } from '@/components/ui/TokenAmount'
 import { useTreasury } from '@/hooks/useTreasury'
 import { isGraphEnabled } from '@/lib/graph/config'
 import { formatUsdc } from '@/lib/utils'
-import { isDemoMode } from '@/lib/demo'
-import type { TreasuryPaymentRow } from '@/lib/graph/mappers'
 
 export default function TreasuryPage() {
   const { treasury, loading, error, recentPayments, dailySpend, refetch } =
@@ -40,10 +38,9 @@ export default function TreasuryPage() {
         </div>
       </div>
 
-      {!isDemoMode() && !isGraphEnabled() && (
+      {!isGraphEnabled() && (
         <p className="rounded-lg border border-forge-warning/40 bg-forge-warning/10 px-4 py-2 text-sm text-forge-warning">
-          Set NEXT_PUBLIC_SUBGRAPH_URL for live indexed history. Showing demo
-          treasury figures until subgraph is connected.
+          Set NEXT_PUBLIC_SUBGRAPH_URL for live indexed history.
         </p>
       )}
 
@@ -120,13 +117,7 @@ export default function TreasuryPage() {
               Venice / agent payees — from The Graph treasury events
             </p>
             <div className="mt-4">
-              <RecentPaymentsTable
-                payments={
-                  recentPayments.length > 0
-                    ? recentPayments
-                    : buildDemoPayments()
-                }
-              />
+              <RecentPaymentsTable payments={recentPayments} />
             </div>
           </div>
         </>
@@ -141,18 +132,3 @@ export default function TreasuryPage() {
   )
 }
 
-function buildDemoPayments(): TreasuryPaymentRow[] {
-  if (!isDemoMode()) return []
-  const now = Math.floor(Date.now() / 1000)
-  return [
-    {
-      id: 'demo-pay-1',
-      payee: '0xVenice0000000000000000000000000000000000',
-      amount: 2_500_000n,
-      agentId: 'defi-rebalancer',
-      txHash:
-        '0xabc0000000000000000000000000000000000000000000000000000000000def',
-      timestamp: now - 3600,
-    },
-  ]
-}

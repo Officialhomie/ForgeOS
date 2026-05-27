@@ -267,7 +267,7 @@ export function formatErc7715Error(error: unknown): string {
   if (diag.kind === 'flask') {
     return (
       'MetaMask Flask is connected, but this build does not expose ERC-7715 (`wallet_requestExecutionPermissions`). ' +
-      'Try an older Flask build with ERC-7715 enabled, or use “Continue with demo delegation” below to finish activation. ' +
+      'Try a Flask build with ERC-7715 enabled. ' +
       `Raw error: ${raw}`
     )
   }

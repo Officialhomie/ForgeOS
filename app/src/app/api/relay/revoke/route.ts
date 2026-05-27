@@ -1,7 +1,19 @@
 import { NextResponse } from 'next/server'
-import { isDemoMode } from '@/lib/demo'
+import { encodeFunctionData } from 'viem'
 import { send7710Transaction } from '@/lib/oneshot/client'
+import { CONTRACTS } from '@/lib/contracts'
+import { APP_URL, ONESHOT } from '@/lib/constants'
 import type { Hash } from '@/types'
+
+const OS_KERNEL_ABI = [
+  {
+    name: 'revokeOne',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'delegationHash', type: 'bytes32' }],
+    outputs: [],
+  },
+] as const
 
 export async function POST(request: Request) {
   try {
@@ -14,30 +26,29 @@ export async function POST(request: Request) {
       )
     }
 
-    if (isDemoMode() || !process.env.ONESHOT_API_KEY) {
-      return NextResponse.json({
-        success: true,
-        taskId: `demo-revoke-${Date.now()}`,
-      })
+    if (!process.env.ONESHOT_API_KEY) {
+      return NextResponse.json({ success: false, error: 'ONESHOT_API_KEY not configured' }, { status: 503 })
     }
 
-    const kernelAddress = process.env.OS_KERNEL_ADDRESS as Hash | undefined
-    if (!kernelAddress) {
-      return NextResponse.json(
-        { success: false, error: 'OS_KERNEL_ADDRESS not configured' },
-        { status: 500 },
-      )
-    }
+    const kernelAddress = CONTRACTS.osKernel
+    const callData = encodeFunctionData({
+      abi: OS_KERNEL_ABI,
+      functionName: 'revokeOne',
+      args: [body.delegationHash],
+    })
 
     const { taskId } = await send7710Transaction({
-      chainId: Number(process.env.ONESHOT_CHAIN_ID ?? 11155111),
+      chainId: ONESHOT.CHAIN_ID,
       userOps: [
         {
           sender: kernelAddress,
-          callData: body.delegationHash, // revokeOne(bytes32) — ABI encode in client
+          target: kernelAddress,
+          value: '0',
+          nonce: 0,
+          callData,
         },
       ],
-      destinationUrl: process.env.ONESHOT_WEBHOOK_URL,
+      destinationUrl: process.env.ONESHOT_WEBHOOK_URL ?? `${APP_URL}/api/webhooks/1shot`,
     })
 
     return NextResponse.json({ success: true, taskId })

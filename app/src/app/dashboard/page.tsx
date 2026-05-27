@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
+import { Tooltip } from '@/components/ui/Tooltip'
+import { SystemHealthBar } from '@/components/ui/SystemHealthBar'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { TokenAmount } from '@/components/ui/TokenAmount'
-import { AddressDisplay } from '@/components/ui/AddressDisplay'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton'
 import { Button } from '@/components/ui/Button'
@@ -12,7 +13,6 @@ import { useTreasury } from '@/hooks/useTreasury'
 import { useActivity } from '@/hooks/useActivity'
 import { useDelegations } from '@/hooks/useDelegations'
 import { timeAgo } from '@/lib/utils'
-import { isDemoMode } from '@/lib/demo'
 
 export default function DashboardPage() {
   const { agents, loading: agentsLoading } = useAgents()
@@ -26,15 +26,19 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-forge-text">Dashboard</h1>
         <p className="mt-1 text-sm text-forge-text-muted">
-          {isDemoMode()
-            ? 'Demo mode — mock on-chain data'
-            : 'Connect MetaMask to load live state'}
+          Your agents, spending, and activity in real time
         </p>
       </div>
 
+      {/* Service health — surfaces Venice / 1Shot / chain status in real time */}
+      <SystemHealthBar className="rounded-xl border border-forge-border bg-forge-surface px-4 py-2.5" />
+
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-12 rounded-xl border border-forge-border bg-forge-surface p-5 md:col-span-4">
-          <p className="text-xs text-forge-text-muted">Treasury balance</p>
+          <span className="inline-flex items-center gap-1 text-xs text-forge-text-muted">
+            Funds available
+            <Tooltip content="The amount of USDC in your agent treasury. Your agents spend from this balance automatically when they take actions. Top up any time from the Treasury page." side="bottom" />
+          </span>
           {treasuryLoading ? (
             <LoadingSkeleton className="mt-2 h-9 w-32" />
           ) : treasury ? (
@@ -46,13 +50,19 @@ export default function DashboardPage() {
           )}
         </div>
         <div className="col-span-12 rounded-xl border border-forge-border bg-forge-surface p-5 md:col-span-4">
-          <p className="text-xs text-forge-text-muted">Active agents</p>
+          <span className="inline-flex items-center gap-1 text-xs text-forge-text-muted">
+            Agents running
+            <Tooltip content="How many of your agents are currently active and taking automated actions in the background. Each agent runs on its own schedule." side="bottom" />
+          </span>
           <p className="mt-2 text-3xl font-bold tabular-nums">
             {agentsLoading ? '—' : activeAgents.length}
           </p>
         </div>
         <div className="col-span-12 rounded-xl border border-forge-border bg-forge-surface p-5 md:col-span-4">
-          <p className="text-xs text-forge-text-muted">Delegations</p>
+          <span className="inline-flex items-center gap-1 text-xs text-forge-text-muted">
+            Active permissions
+            <Tooltip content="The number of agents you have approved to act on your behalf. Each permission has strict rules about what that agent is allowed to do. You can revoke any of them at any time." side="bottom" />
+          </span>
           <p className="mt-2 text-3xl font-bold tabular-nums">
             {delegations.filter((d) => d.status === 'active').length}
           </p>
@@ -60,7 +70,7 @@ export default function DashboardPage() {
       </div>
 
       <section className="rounded-xl border border-forge-border bg-forge-surface p-5">
-        <h2 className="text-base font-semibold">Agent fleet</h2>
+        <h2 className="text-base font-semibold">Your agents</h2>
         {agentsLoading ? (
           <div className="mt-4 space-y-2">
             <LoadingSkeleton className="h-12 w-full" />
@@ -69,7 +79,7 @@ export default function DashboardPage() {
         ) : agents.length === 0 ? (
           <EmptyState
             title="No agents"
-            description="Activate ForgeOS to install your agent fleet."
+            description="Get started by activating your account. Your agents will appear here."
             action={
               <Link href="/activate">
                 <Button>Activate</Button>
@@ -118,22 +128,6 @@ export default function DashboardPage() {
         </ul>
       </section>
 
-      {isDemoMode() ? (
-        <section className="rounded-xl border border-forge-border bg-forge-surface p-5">
-          <h2 className="text-base font-semibold">UI primitives (demo)</h2>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <StatusBadge variant="active" />
-            <StatusBadge variant="running" />
-            <StatusBadge variant="paused" />
-            <StatusBadge variant="error" />
-            <AddressDisplay address="0xOSKernel000000000000000000000000000000000" />
-            <TokenAmount amount={BigInt('1250000000')} />
-            <Button variant="default">Primary</Button>
-            <Button variant="ghost">Ghost</Button>
-            <Button variant="destructive">Danger</Button>
-          </div>
-        </section>
-      ) : null}
     </div>
   )
 }

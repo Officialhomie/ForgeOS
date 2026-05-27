@@ -18,6 +18,7 @@ import { ONESHOT } from '@/lib/constants'
 import { verifyWebhookSignature, extractSignature } from '@/lib/oneshot/webhook'
 import { taskStore } from '@/lib/oneshot/task-store'
 import { activityEmitter } from '@/lib/events/activity-emitter'
+import { isKillSwitchTask } from '@/lib/kill-switch/registry'
 import type { OneShotWebhookPayload, ActivityEvent, Hash } from '@/types'
 
 export async function POST(request: Request) {
@@ -59,19 +60,30 @@ export async function POST(request: Request) {
   const isConfirmed = payload.status === 'Confirmed'
   const isFailed = payload.status === 'Rejected' || payload.status === 'Reverted'
 
+  const killSwitch = isKillSwitchTask(payload.taskId)
+
   const event: ActivityEvent = {
     id: `webhook_${payload.taskId}_${Date.now()}`,
-    type: isConfirmed ? 'agent_run_confirmed' : 'agent_run_failed',
+    type: killSwitch && isFailed
+      ? 'kill_switch_failed'
+      : killSwitch && isConfirmed
+        ? 'os_revoked'
+        : isConfirmed
+          ? 'agent_run_confirmed'
+          : 'agent_run_failed',
     agentId: null,
-    title: isConfirmed
-      ? 'Transaction confirmed'
-      : `Transaction ${payload.status.toLowerCase()}`,
+    title: killSwitch && isFailed
+      ? 'Kill switch failed — delegations restored'
+      : isConfirmed
+        ? 'Transaction confirmed'
+        : `Transaction ${payload.status.toLowerCase()}`,
     description: payload.txHash
       ? `tx ${payload.txHash.slice(0, 10)}… on chain ${ONESHOT.CHAIN_ID}`
       : payload.failureReason ?? `taskId: ${payload.taskId}`,
     amount: null,
     txHash: (payload.txHash as Hash) ?? null,
     delegationHash: null,
+    taskId: payload.taskId,
     timestamp: Math.floor(Date.now() / 1000),
     status: isConfirmed ? 'confirmed' : isFailed ? 'failed' : 'pending',
   }

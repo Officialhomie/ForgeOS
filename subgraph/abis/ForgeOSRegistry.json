@@ -1,0 +1,20 @@
+[
+  {
+    "type": "event",
+    "name": "AgentRegistered",
+    "inputs": [
+      { "name": "agentId", "type": "bytes32", "indexed": true,  "internalType": "bytes32" },
+      { "name": "owner",   "type": "address", "indexed": true,  "internalType": "address" },
+      { "name": "name",    "type": "string",  "indexed": false, "internalType": "string"  }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "AgentDeactivated",
+    "inputs": [
+      { "name": "agentId", "type": "bytes32", "indexed": true, "internalType": "bytes32" }
+    ],
+    "anonymous": false
+  }
+]

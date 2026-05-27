@@ -16,8 +16,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { isDemoMode } from '@/lib/demo'
-import { executeX402Cycle, executeX402CycleDemo } from '@/services/treasury-engine/x402-meter'
+import { executeX402Cycle } from '@/services/treasury-engine/x402-meter'
 import { taskStore } from '@/lib/oneshot/task-store'
 import { CONTRACTS } from '@/lib/contracts'
 import type { Subscription } from '@/types'
@@ -67,22 +66,6 @@ export async function POST(request: Request) {
     )
   }
 
-  // ── Demo mode ──────────────────────────────────────────────────────────────
-  if (isDemoMode()) {
-    const result = executeX402CycleDemo(subscription)
-    taskStore.create(result.taskId)
-    taskStore.update(result.taskId, 'Confirmed', result.taskId as `0x${string}`)
-
-    return NextResponse.json({
-      success: true,
-      taskId: result.taskId,
-      cycleCost: result.cycleCost.toString(),
-      model: result.model,
-      paymentsRemaining: subscription.paymentsRemaining - 1,
-    })
-  }
-
-  // ── Live mode ──────────────────────────────────────────────────────────────
   try {
     const proof = delegationProof ?? ('0x' as `0x${string}`)
 

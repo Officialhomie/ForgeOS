@@ -6,6 +6,22 @@ import { DelegationCard } from '@/components/delegations/DelegationCard'
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 
+import { Button } from '@/components/ui/Button'
+import { useDelegationsStore } from '@/stores/delegations.store'
+
+function exportProofBundle() {
+  const delegations = useDelegationsStore.getState().delegations
+  const blob = new Blob([JSON.stringify(delegations, null, 2)], {
+    type: 'application/json',
+  })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'forgeos-delegation-bundle.json'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function DelegationsPage() {
   const { delegations, tree, loading } = useDelegations()
 
@@ -16,9 +32,14 @@ export default function DelegationsPage() {
       {/* ── Header ── */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Delegations</h1>
-        <p className="text-sm text-forge-text-muted">
-          {active.length} active of {delegations.length} total
-        </p>
+        <div className="flex items-center gap-3">
+          <Button variant="secondary" size="sm" onClick={exportProofBundle}>
+            Export proof bundle
+          </Button>
+          <p className="text-sm text-forge-text-muted">
+            {active.length} active of {delegations.length} total
+          </p>
+        </div>
       </div>
 
       {loading ? (

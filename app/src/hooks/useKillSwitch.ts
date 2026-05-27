@@ -1,20 +1,8 @@
-/**
- * P12.1 — Kill Switch hook
- *
- * Calls OSKernel.revokeAll() via 1Shot relay.
- * Optimistic UI: immediately marks all delegations as revoked in Zustand
- * before the tx confirms. On webhook Rejected: restores state + shows error.
- *
- * Track evidence: Best Agent (safety / emergency revoke UX)
- */
-
 'use client'
 
-import { useState } from 'react'
-import { isDemoMode } from '@/lib/demo'
+import { useState, useEffect, useRef } from 'react'
 import { useDelegationsStore } from '@/stores/delegations.store'
-import { activityEmitter } from '@/lib/events/activity-emitter'
-import type { ActivityEvent } from '@/types'
+import { useActivityStore } from '@/stores/activity.store'
 
 export interface KillSwitchState {
   isPending: boolean
@@ -29,58 +17,65 @@ export function useKillSwitch(): KillSwitchState {
   const [isPending, setIsPending] = useState(false)
   const [isRevoked, setIsRevoked] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const pendingTaskId = useRef<string | null>(null)
+  const snapshotRef = useRef<ReturnType<typeof useDelegationsStore.getState>['delegations']>([])
 
   const delegations = useDelegationsStore((s) => s.delegations)
   const setDelegations = useDelegationsStore((s) => s.setDelegations)
+  const activities = useActivityStore((s) => s.activityFeed)
 
   const activeDelegationCount = delegations.filter((d) => d.status === 'active').length
+
+  useEffect(() => {
+    const taskId = pendingTaskId.current
+    if (!taskId) return
+
+    const match = activities.find(
+      (a) => a.taskId === taskId && (a.status === 'confirmed' || a.status === 'failed'),
+    )
+    if (!match) return
+
+    if (match.type === 'kill_switch_failed' || match.status === 'failed') {
+      setDelegations(snapshotRef.current)
+      setError(match.description || 'Kill switch transaction failed')
+      setIsRevoked(false)
+    } else if (match.status === 'confirmed') {
+      setIsRevoked(true)
+    }
+
+    pendingTaskId.current = null
+    setIsPending(false)
+  }, [activities, setDelegations])
 
   async function revokeAll() {
     setIsPending(true)
     setError(null)
 
-    // Optimistic update — immediately mark all delegations revoked in UI
-    const snapshot = delegations
+    snapshotRef.current = delegations
     const revoked = delegations.map((d) => ({ ...d, status: 'revoked' as const }))
     setDelegations(revoked)
 
-    if (isDemoMode()) {
-      await new Promise<void>((r) => setTimeout(r, 900))
-
-      const event: ActivityEvent = {
-        id: `kill_switch_demo_${Date.now()}`,
-        type: 'os_revoked',
-        agentId: null,
-        title: 'All delegations revoked (demo)',
-        description: `${activeDelegationCount} delegation(s) atomically revoked via OSKernel.revokeAll()`,
-        amount: null,
-        txHash: `0xKILL${Date.now().toString(16).padStart(60, '0')}` as `0x${string}`,
-        delegationHash: null,
-        timestamp: Math.floor(Date.now() / 1000),
-        status: 'confirmed',
-      }
-      activityEmitter.emitActivity(event)
-
-      setIsRevoked(true)
-      setIsPending(false)
-      return
-    }
-
-    // Live mode
     try {
-      const res = await fetch('/api/relay/revoke-all', { method: 'POST' })
+      const res = await fetch('/api/relay/revoke-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ delegations }),
+      })
       const data = (await res.json()) as { success: boolean; error?: string; taskId?: string }
 
       if (!data.success) {
         throw new Error(data.error ?? 'revokeAll relay failed')
       }
 
-      setIsRevoked(true)
+      if (data.taskId) {
+        pendingTaskId.current = data.taskId
+      } else {
+        setIsRevoked(true)
+        setIsPending(false)
+      }
     } catch (e) {
-      // Restore snapshot on failure
-      setDelegations(snapshot)
+      setDelegations(snapshotRef.current)
       setError(e instanceof Error ? e.message : 'Kill switch failed')
-    } finally {
       setIsPending(false)
     }
   }
@@ -88,6 +83,7 @@ export function useKillSwitch(): KillSwitchState {
   function reset() {
     setIsRevoked(false)
     setError(null)
+    pendingTaskId.current = null
   }
 
   return { isPending, isRevoked, error, activeDelegationCount, revokeAll, reset }

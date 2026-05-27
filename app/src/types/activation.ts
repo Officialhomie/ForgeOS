@@ -1,4 +1,4 @@
-import type { Address, Hash, ChainId } from '@/types'
+import type { Address, Hash, ChainId, Delegation } from '@/types'
 import { FORGE_CHAIN_ID, VENICE_CHAIN_ID } from '@/lib/chains/network'
 
 export type ActivationStepId =
@@ -32,6 +32,9 @@ export interface ActivationPersistedState {
   kernelAddress?: Address
   treasuryAddress?: Address
   delegationHash?: Hash
+  rootDelegation?: Delegation
+  subDelegation?: Delegation
+  reDelegation?: Delegation
   deployTxHash?: Hash
   fundTxHash?: Hash
   oneShotTaskId?: string
@@ -50,10 +53,10 @@ export const DEFAULT_POLICY_PREVIEW: ActivationPolicyPreview = {
   maxSingleTxUsdc: '200',
   expiryLabel: '30 days from activation',
   caveats: [
-    'AllowedMethodsEnforcer: executeAction, redelegate',
-    'ERC20TransferAmountEnforcer: max 500 USDC / month',
-    'TimestampEnforcer: valid for 30 days',
-    'AllowedTargetsEnforcer: approved DeFi + payment contracts',
+    'Allowed actions: run tasks and pass access to sub-agents',
+    'Spending limit: max 500 USDC per month',
+    'Expires: valid for 30 days',
+    'Restricted to: approved DeFi and payment services only',
   ],
 }
 

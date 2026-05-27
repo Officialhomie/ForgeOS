@@ -11,11 +11,11 @@
 import { getVeniceClient } from '@/lib/venice/client'
 import type {
   ActionPlan,
+  Address,
   AgentId,
   PlannedAction,
   ActionType,
   Hash,
-  Address,
 } from '@/types'
 
 // ─── A2A SYSTEM PROMPT ────────────────────────────────────────────────────────
@@ -104,12 +104,17 @@ export async function parseA2AIntent(
   rootHash: Hash,
   defiHash: Hash,
   redelHash: Hash,
+  sessionId?: string,
 ): Promise<ActionPlan> {
-  const venice = getVeniceClient()
+  const venice = await getVeniceClient()
+
+  const sessionNote = sessionId
+    ? `\nCollaboration session: ${sessionId}. Hop 2 must reference hop 1 budget/outputs.`
+    : ''
 
   const { completion } = await venice.chat({
     messages: [
-      { role: 'system', content: A2A_SYSTEM_PROMPT },
+      { role: 'system', content: A2A_SYSTEM_PROMPT + sessionNote },
       { role: 'user', content: intent },
     ],
   })
@@ -197,51 +202,3 @@ function buildA2APlan(
   }
 }
 
-// ─── DEMO MODE ────────────────────────────────────────────────────────────────
-
-export function mockA2APlan(
-  intent: string,
-  rootHash: Hash,
-  defiHash: Hash,
-  redelHash: Hash,
-): ActionPlan {
-  return {
-    id: `plan_a2a_demo_${Date.now()}`,
-    intent,
-    summary: 'Rebalance portfolio: DeFiAgent calculates swap, PaymentAgent executes transfer',
-    actions: [
-      {
-        id: 'hop1',
-        type: 'erc20_swap',
-        agentId: 'defi-rebalancer',
-        delegationChain: [rootHash, defiHash],
-        target: '0x0000000000000000000000000000000000000001' as Address,
-        calldata: '0x',
-        value: 50_000000n,
-        humanDescription: 'DeFiAgent: calculate 60/40 BTC/ETH rebalance, determine swap amount',
-        estimatedOutput: '50 USDC → ~0.021 ETH',
-        withinDelegationScope: true,
-        dependsOn: [],
-      },
-      {
-        id: 'hop2',
-        type: 'erc20_transfer',
-        agentId: 'payment-executor',
-        delegationChain: [rootHash, defiHash, redelHash],
-        target: '0x0000000000000000000000000000000000000002' as Address,
-        calldata: '0x',
-        value: 50_000000n,
-        humanDescription: 'PaymentAgent: execute 50 USDC transfer via re-delegation proof',
-        estimatedOutput: 'Transfer confirmed on Sepolia',
-        withinDelegationScope: true,
-        dependsOn: ['hop1'],
-      },
-    ],
-    estimatedCost: 40000n,
-    estimatedGas: 0n,
-    withinPolicy: true,
-    policyViolations: [],
-    generatedAt: Math.floor(Date.now() / 1000),
-    veniceModel: 'llama-3.3-70b',
-  }
-}

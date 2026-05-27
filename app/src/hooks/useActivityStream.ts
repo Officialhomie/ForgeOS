@@ -1,14 +1,12 @@
 'use client'
 
 import { useEffect } from 'react'
-import { isDemoMode } from '@/lib/demo'
 import { useActivityStore } from '@/stores/activity.store'
 import type { ActivityEvent, OneShotTask } from '@/types'
 
 /**
- * Subscribes to /api/events (SSE) in live mode.
+ * Subscribes to /api/events (SSE).
  * Pushes incoming ActivityEvents into the Zustand activity store.
- * No-op in demo mode (mock data is pre-loaded by hydrate-demo).
  *
  * Mount once in dashboard/layout.tsx — EventSource auto-reconnects on error.
  */
@@ -16,8 +14,6 @@ export function useActivityStream() {
   const pushActivity = useActivityStore((s) => s.pushActivity)
 
   useEffect(() => {
-    if (isDemoMode()) return
-
     const es = new EventSource('/api/events')
 
     es.addEventListener('activity', (e: MessageEvent<string>) => {

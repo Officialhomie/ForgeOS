@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { ONESHOT } from '@/lib/constants'
-import { isDemoMode } from '@/lib/demo'
 import { send7710Transaction } from '@/lib/oneshot/client'
 
 export async function POST(request: Request) {
@@ -10,12 +9,8 @@ export async function POST(request: Request) {
       delegationHash?: string
     }
 
-    if (isDemoMode() || !process.env.ONESHOT_API_KEY) {
-      return NextResponse.json({
-        taskId: `demo-delegate-${Date.now()}`,
-        delegationHash: body.delegationHash,
-        status: 'confirmed',
-      })
+    if (!process.env.ONESHOT_API_KEY) {
+      return NextResponse.json({ error: 'ONESHOT_API_KEY not configured' }, { status: 503 })
     }
 
     const chainId = body.chainId ?? ONESHOT.CHAIN_ID

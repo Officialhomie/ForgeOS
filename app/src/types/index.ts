@@ -283,6 +283,7 @@ export type ActivityEventType =
   | 'os_activated'
   | 'os_revoked'
   | 'command_executed'
+  | 'kill_switch_failed'
 
 export interface ActivityEvent {
   id: string
@@ -293,6 +294,7 @@ export interface ActivityEvent {
   amount: bigint | null
   txHash: Hash | null
   delegationHash: Hash | null
+  taskId?: string | null
   timestamp: number
   status: 'confirmed' | 'pending' | 'failed'
 }
@@ -307,6 +309,13 @@ export type CommandStatus =
   | 'confirmed'
   | 'failed'
 
+export interface FlowTiming {
+  flow: string
+  totalMs: number
+  steps: Record<string, number>
+  checkpoints: Array<{ name: string; elapsedMs: number }>
+}
+
 export interface CommandState {
   status: CommandStatus
   intent: string
@@ -315,6 +324,8 @@ export interface CommandState {
   runId: string | null
   oneShotTaskId: string | null
   error: string | null
+  /** Per-step latency from the last /api/command call */
+  timing: FlowTiming | null
 }
 
 export interface VeniceMessage {
@@ -348,6 +359,9 @@ export interface VeniceSystemContext {
   portfolioSnapshot: PortfolioSnapshot
   agentCapabilities: AgentCapabilitySummary[]
   policy: Policy
+  /** Shared session for multi-hop A2A collaboration (Flow 8) */
+  sessionId?: string
+  priorHopSummary?: string
 }
 
 export interface VeniceRequest {
@@ -459,4 +473,17 @@ export interface OneShotWebhookPayload {
   txHash?: Hash
   failureReason?: string
   signature: string
+}
+
+// ─── ERC-4337 / DELEGATION FRAMEWORK ─────────────────────────────────────────
+
+/** ModeCode for redeemDelegations() — DEFAULT = single call execution */
+export type ModeCode = `0x${string}`
+
+/** AgentConfig extended with runtime trigger fields (Phase 4) */
+export interface AgentRuntimeConfig extends AgentConfig {
+  enabled: boolean
+  intervalSeconds: number
+  lastTriggeredAt: number | null
+  triggerType: 'cron' | 'manual' | 'event'
 }

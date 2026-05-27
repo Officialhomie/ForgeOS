@@ -116,25 +116,3 @@ export async function executeX402Cycle(options: X402MeterOptions): Promise<X402C
   return { taskId, cycleCost: subscription.amount, model: veniceModel }
 }
 
-// ─── DEMO MODE ────────────────────────────────────────────────────────────────
-
-export function executeX402CycleDemo(subscription: Subscription): X402CycleResult {
-  const taskId = `demo-x402-${Date.now()}`
-  const mockTxHash = `0xX402${Date.now().toString(16).padStart(60, '0')}` as `0x${string}`
-
-  const activity: ActivityEvent = {
-    id: `x402_${taskId}`,
-    type: 'subscription_payment',
-    agentId: subscription.agentId as AgentId,
-    title: `${subscription.name} payment (demo)`,
-    description: `${Number(subscription.amount) / 1_000_000} USDC → ${subscription.recipient.slice(0, 6)}...${subscription.recipient.slice(-4)}`,
-    amount: subscription.amount,
-    txHash: mockTxHash,
-    delegationHash: subscription.delegation.hash,
-    timestamp: Math.floor(Date.now() / 1000),
-    status: 'confirmed',
-  }
-  activityEmitter.emitActivity(activity)
-
-  return { taskId, cycleCost: subscription.amount, model: 'llama-3.3-70b' }
-}

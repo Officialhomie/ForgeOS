@@ -1,13 +1,15 @@
 'use client'
 
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
+import { useActivityStore } from '@/stores/activity.store'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useCommandStore } from '@/stores/command.store'
 import { useCommandBar } from '@/hooks/useCommandBar'
+import { useAgentExecute } from '@/hooks/useAgentExecute'
 import { Button } from '@/components/ui/Button'
 import { cn, formatUsdc, explorerTxUrl } from '@/lib/utils'
 import { ONESHOT } from '@/lib/constants'
-import type { ActionPlan } from '@/types'
+import type { ActionPlan, FlowTiming } from '@/types'
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -21,6 +23,7 @@ interface SerialisedPlan extends Omit<ActionPlan, 'estimatedCost' | 'estimatedGa
 
 export function CommandBarModal() {
   useCommandBar() // registers Cmd+K global shortcut
+  const { executePlan } = useAgentExecute()
 
   const isOpen = useCommandStore((s) => s.isOpen)
   const setOpen = useCommandStore((s) => s.setOpen)
@@ -33,6 +36,8 @@ export function CommandBarModal() {
   const [query, setQuery] = useState('')
   const abortRef = useRef<AbortController | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const activityFeed = useActivityStore((s) => s.activityFeed)
+  const awaitingTaskId = useRef<string | null>(null)
 
   // ── Submit query to Venice ─────────────────────────────────────────────────
 
@@ -55,12 +60,12 @@ export function CommandBarModal() {
       })
 
       const data = (await res.json()) as
-        | { success: true; actionPlan: SerialisedPlan; veniceModel: string; cost: string }
+        | { success: true; actionPlan: SerialisedPlan; veniceModel: string; cost: string; timing?: FlowTiming }
         | { success: false; error: string; code: string }
 
       if (data.success) {
         const plan = deserialisePlan(data.actionPlan)
-        setCommand({ status: 'planning', actionPlan: plan })
+        setCommand({ status: 'planning', actionPlan: plan, timing: data.timing ?? null })
         setPendingPlan(plan)
       } else {
         setCommand({ status: 'failed', error: data.error })
@@ -78,30 +83,43 @@ export function CommandBarModal() {
     setCommand({ status: 'executing' })
 
     try {
-      const res = await fetch('/api/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actionPlan: serialisePlan(plan) }),
-      })
-
-      const data = (await res.json()) as
-        | { success: true; taskId: string }
-        | { success: false; error: string; code: string }
-
-      if (data.success) {
-        setCommand({ status: 'confirmed', oneShotTaskId: data.taskId })
-        setTimeout(() => {
-          setOpen(false)
-          resetCommand()
-          setQuery('')
-        }, 3000)
-      } else {
-        setCommand({ status: 'failed', error: data.error })
-      }
-    } catch {
-      setCommand({ status: 'failed', error: 'Execute failed' })
+      const { taskId } = await executePlan(plan)
+      awaitingTaskId.current = taskId
+      setCommand({ status: 'executing', oneShotTaskId: taskId })
+    } catch (e) {
+      setCommand({ status: 'failed', error: e instanceof Error ? e.message : 'Execute failed' })
     }
-  }, [setCommand, setOpen, resetCommand])
+  }, [executePlan, setCommand])
+
+  useEffect(() => {
+    const taskId = awaitingTaskId.current
+    if (!taskId || command.status !== 'executing') return
+
+    const match = activityFeed.find(
+      (a) =>
+        a.taskId === taskId &&
+        (a.status === 'confirmed' || a.status === 'failed'),
+    )
+    if (!match) return
+
+    awaitingTaskId.current = null
+    if (match.status === 'confirmed') {
+      setCommand({
+        status: 'confirmed',
+        oneShotTaskId: taskId,
+      })
+      setTimeout(() => {
+        setOpen(false)
+        resetCommand()
+        setQuery('')
+      }, 2500)
+    } else {
+      setCommand({
+        status: 'failed',
+        error: match.description || 'Transaction rejected on-chain',
+      })
+    }
+  }, [activityFeed, command.status, setCommand, setOpen, resetCommand])
 
   const handleClose = useCallback(() => {
     abortRef.current?.abort()
@@ -152,7 +170,12 @@ export function CommandBarModal() {
             )}
 
             {command.status === 'failed' && (
-              <p className="text-sm text-red-400">{command.error}</p>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-red-400">Something went wrong</p>
+                <p className="text-xs text-red-400/80">
+                  {friendlyCommandError(command.error)}
+                </p>
+              </div>
             )}
 
             {(command.status === 'planning' || command.status === 'executing') && pendingPlan && (
@@ -163,17 +186,23 @@ export function CommandBarModal() {
               />
             )}
 
+            {command.status === 'executing' && command.oneShotTaskId && (
+              <div className="space-y-1">
+                <p className="text-sm text-forge-text-muted">Waiting for 1Shot confirmation…</p>
+                <p className="font-mono text-xs text-forge-text-subtle">
+                  task: {command.oneShotTaskId}
+                </p>
+              </div>
+            )}
+
             {command.status === 'confirmed' && (
               <div className="space-y-1">
-                <p className="text-sm font-medium text-green-400">Transaction submitted</p>
+                <p className="text-sm font-medium text-green-400">Transaction confirmed</p>
                 {command.oneShotTaskId && (
                   <p className="font-mono text-xs text-forge-text-muted">
                     1Shot task: {command.oneShotTaskId}
                   </p>
                 )}
-                <p className="text-xs text-forge-text-subtle">
-                  Confirmation will appear in activity feed.
-                </p>
               </div>
             )}
           </div>
@@ -181,7 +210,7 @@ export function CommandBarModal() {
           {/* ── Footer hint ── */}
           <div className="flex items-center justify-between border-t border-forge-border px-4 py-2">
             <span className="text-xs text-forge-text-subtle">
-              Powered by Venice AI · Gas sponsored by 1Shot
+              Powered by Venice AI · Gas sponsored by 1Shot{command.timing && command.timing.steps.venice != null && (<span className="ml-2 opacity-60"> · Venice {command.timing.steps.venice}ms · Total {command.timing.totalMs}ms</span>)}
             </span>
             <kbd className="rounded border border-forge-border bg-forge-bg px-1.5 py-0.5 font-mono text-xs text-forge-text-subtle">
               Esc
@@ -279,6 +308,25 @@ function Spinner() {
       />
     </svg>
   )
+}
+
+// ─── ERROR HELPERS ────────────────────────────────────────────────────────────
+
+function friendlyCommandError(raw: string | null | undefined): string {
+  if (!raw) return 'Unknown error. Please try again.'
+  if (raw.includes('Agent wallet not configured') || raw.includes('AGENT_WALLET_KEY')) {
+    return 'The server agent wallet is not set up. Add AGENT_WALLET_KEY to your .env.local and restart the dev server.'
+  }
+  if (raw.includes('signing failed') || raw.includes('Failed to sign') || raw.includes('fetch failed')) {
+    return 'The agent wallet could not sign the request — check your server wallet configuration (AGENT_WALLET_KEY or Turnkey credentials).'
+  }
+  if (raw.includes('Treasury balance') || raw.includes('INSUFFICIENT_TREASURY')) {
+    return 'Your treasury balance is too low to pay for AI inference. Top up from the Treasury page.'
+  }
+  if (raw.includes('Venice API') || raw.includes('VENICE_ERROR')) {
+    return 'Venice AI returned an error. Check your API connection and try again.'
+  }
+  return raw
 }
 
 // ─── SERIALISATION HELPERS ────────────────────────────────────────────────────

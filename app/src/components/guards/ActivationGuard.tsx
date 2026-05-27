@@ -3,7 +3,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useOsStore } from '@/stores/os.store'
-import { isDemoMode } from '@/lib/demo'
 import { loadActivationState } from '@/lib/activation/storage'
 
 export function ActivationGuard({ children }: { children: ReactNode }) {
@@ -12,7 +11,6 @@ export function ActivationGuard({ children }: { children: ReactNode }) {
   const osStatus = useOsStore((s) => s.osStatus)
 
   useEffect(() => {
-    if (isDemoMode()) return
     const saved = loadActivationState()
     const active = osStatus === 'active' || saved?.phase === 'active'
     if (!active) {
@@ -20,7 +18,7 @@ export function ActivationGuard({ children }: { children: ReactNode }) {
     }
   }, [osStatus, router, pathname])
 
-  if (!isDemoMode() && osStatus !== 'active') {
+  if (osStatus !== 'active') {
     const saved = loadActivationState()
     if (saved?.phase !== 'active') {
       return (

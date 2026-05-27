@@ -22,3 +22,24 @@ export function clearActivationState(): void {
   if (typeof window === 'undefined') return
   localStorage.removeItem(STORAGE_KEY)
 }
+
+export function loadRootDelegation(): import('@/types').Delegation | null {
+  return loadActivationState()?.rootDelegation ?? null
+}
+
+export function saveDelegationsToActivation(patch: {
+  rootDelegation?: import('@/types').Delegation
+  subDelegation?: import('@/types').Delegation
+  reDelegation?: import('@/types').Delegation
+  delegationHash?: import('@/types').Hash
+}): void {
+  const prev = loadActivationState()
+  saveActivationState({
+    phase: prev?.phase ?? 'idle',
+    completedSteps: prev?.completedSteps ?? [],
+    updatedAt: Date.now(),
+    ...prev,
+    ...patch,
+    delegationHash: patch.delegationHash ?? patch.rootDelegation?.hash ?? prev?.delegationHash,
+  })
+}

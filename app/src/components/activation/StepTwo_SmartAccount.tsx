@@ -95,7 +95,7 @@ export function StepTwo_SmartAccount() {
           onClick={() => void deploySmartAccount()}
           disabled={gated || busy}
         >
-          {busy ? 'Activating smart account…' : 'Continue with smart account'}
+          {busy ? 'Setting up your account…' : 'Continue'}
         </Button>
       </CardContent>
     </Card>

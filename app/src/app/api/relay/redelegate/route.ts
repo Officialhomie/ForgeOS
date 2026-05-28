@@ -6,6 +6,7 @@
 
 import { NextResponse } from 'next/server'
 import { send7710Transaction } from '@/lib/oneshot/client'
+import { isOneShotUnavailableError } from '@/lib/activation/oneshot-unavailable'
 import { encodeKernelRedelegateCalldata } from '@/lib/delegation/encode-kernel'
 import { taskStore } from '@/lib/oneshot/task-store'
 import { APP_URL, ONESHOT } from '@/lib/constants'
@@ -61,6 +62,11 @@ export async function POST(request: Request) {
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'redelegate relay failed'
+    if (isOneShotUnavailableError(msg)) {
+      // 1Shot has no payment tokens on this chain (expected on Sepolia).
+      // The delegation is created locally — skip the on-chain relay gracefully.
+      return NextResponse.json({ success: true, taskId: 'relay-unavailable', delegationHash: delegation.hash })
+    }
     return NextResponse.json({ success: false, error: msg }, { status: 500 })
   }
 }

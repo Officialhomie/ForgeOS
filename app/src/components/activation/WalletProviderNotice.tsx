@@ -27,7 +27,7 @@ export function WalletProviderNotice() {
       <div className="rounded-lg border border-forge-danger/50 bg-forge-danger/10 px-3 py-2.5 text-xs text-forge-danger">
         <p className="font-semibold">Connected to standard MetaMask</p>
         <p className="mt-1 text-forge-danger/90">
-          ERC-7715 needs MetaMask Flask. Disable standard MetaMask, use Flask only,
+          Agent permissions need MetaMask Flask. Disable standard MetaMask, use Flask only,
           refresh, and reconnect.
         </p>
       </div>

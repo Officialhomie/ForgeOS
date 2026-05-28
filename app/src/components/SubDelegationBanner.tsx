@@ -12,12 +12,14 @@ export function SubDelegationBanner() {
       className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
       role="alert"
     >
-      {loading && <p>Creating on-chain A2A sub-delegation chain…</p>}
+      {loading && <p>Setting up agent permissions in the background…</p>}
       {error && (
-        <p>
-          Sub-delegation setup failed: {error}. Command execution and cron runs are blocked until
-          this is resolved.
-        </p>
+        <div>
+          <p className="font-medium">Agent setup hit a snag</p>
+          <p className="mt-1 text-xs text-amber-300/80">
+            {error} Some agent actions may be limited — this often resolves on its own.
+          </p>
+        </div>
       )}
     </div>
   )

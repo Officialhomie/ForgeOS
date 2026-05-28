@@ -5,7 +5,7 @@ import { useOsStore } from '@/stores/os.store'
 import { useDelegationsStore } from '@/stores/delegations.store'
 import { createOSSubDelegations } from '@/lib/delegation/auto-delegate'
 import { ONCHAIN_DELEGATION_MARKER } from '@/lib/delegation/proof-bundle'
-import { loadActivationState, saveDelegationsToActivation } from '@/lib/activation/storage'
+import { useActivationStore } from '@/stores/activation.store'
 import type { Delegation, Hash } from '@/types'
 
 export interface SubDelegationsState {
@@ -97,12 +97,7 @@ export function useSubDelegations(): SubDelegationsState {
         ]
         setDelegations(all)
 
-        saveDelegationsToActivation({
-          subDelegation: subConfirmed,
-          reDelegation: reConfirmed,
-        })
-
-        const smartAccount = loadActivationState()?.smartAccountAddress
+        const smartAccount = useActivationStore.getState().smartAccountAddress
         if (smartAccount) {
           await fetch('/api/delegations/bundle', {
             method: 'POST',

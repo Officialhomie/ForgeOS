@@ -27,7 +27,7 @@ export function TreasuryDonut({
   if (data.length === 0) {
     return (
       <p className="py-12 text-center text-sm text-forge-text-muted">
-        No treasury activity yet
+        No spending activity yet
       </p>
     )
   }

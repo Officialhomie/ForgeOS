@@ -1,0 +1,29 @@
+[
+  {
+    "type": "event",
+    "name": "DelegationGranted",
+    "inputs": [
+      { "name": "delegationHash", "type": "bytes32", "indexed": true, "internalType": "bytes32" },
+      { "name": "delegate",       "type": "address", "indexed": true, "internalType": "address" },
+      { "name": "delegator",      "type": "address", "indexed": true, "internalType": "address" }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DelegationRevoked",
+    "inputs": [
+      { "name": "delegationHash", "type": "bytes32", "indexed": true, "internalType": "bytes32" }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "AllDelegationsRevoked",
+    "inputs": [
+      { "name": "owner", "type": "address", "indexed": true,  "internalType": "address" },
+      { "name": "count", "type": "uint256", "indexed": false, "internalType": "uint256" }
+    ],
+    "anonymous": false
+  }
+]

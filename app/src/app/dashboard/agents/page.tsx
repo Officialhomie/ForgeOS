@@ -37,7 +37,10 @@ export default function AgentsPage() {
     <div className="mx-auto max-w-7xl space-y-6">
       {/* ── Header ── */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">Agents</h1>
+        <div>
+          <h1 className="text-2xl font-bold">Your agents</h1>
+          <p className="mt-1 text-sm text-forge-text-muted">All the helpers you have running or on standby.</p>
+        </div>
         <p className="text-sm text-forge-text-muted">{agents.length} installed</p>
       </div>
 
@@ -69,11 +72,11 @@ export default function AgentsPage() {
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
-          title={filter === 'all' ? 'No agents installed' : `No ${filter} agents`}
+          title={filter === 'all' ? 'No agents yet' : `No ${filter} agents`}
           description={
             filter === 'all'
-              ? 'Activate ForgeOS and install your first agent to get started.'
-              : 'Switch the filter to see other agents.'
+              ? 'Head to the marketplace and pick an agent — it takes seconds to set one up.'
+              : 'Try a different filter to see more agents.'
           }
         />
       ) : (

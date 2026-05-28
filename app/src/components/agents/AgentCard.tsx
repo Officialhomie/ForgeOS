@@ -88,7 +88,7 @@ export function AgentCard({
         </div>
         <div>
           <p className="text-lg font-semibold tabular-nums">{formatUsdc(agent.gasSaved)}</p>
-          <p className="text-[11px] text-forge-text-subtle">Gas saved</p>
+          <p className="text-[11px] text-forge-text-subtle">Fees saved</p>
         </div>
       </div>
 

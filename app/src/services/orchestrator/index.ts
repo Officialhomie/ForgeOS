@@ -12,21 +12,17 @@
  */
 
 import { routeIntent } from './agent-router'
-import { parseA2AIntent, mockA2APlan } from './intent-parser'
+import { parseA2AIntent } from './intent-parser'
 import type { ActionPlan, Hash } from '@/types'
 
 // ─── ORCHESTRATOR INPUT ───────────────────────────────────────────────────────
 
 export interface OrchestratorInput {
   intent: string
-  /** Root delegation hash (User → OSKernel) — must be signed */
   rootDelegationHash: Hash
-  /** Sub-delegation hash (OSKernel → DeFiAgent) — created by createSubDelegation */
   subDelegationHash: Hash
-  /** Re-delegation hash (DeFiAgent → PaymentAgent) — created by createReDelegation */
   reDelegationHash: Hash
-  /** If true, skip Venice and return mock plan */
-  demoMode?: boolean
+  sessionId?: string
 }
 
 // ─── ORCHESTRATOR RESULT ──────────────────────────────────────────────────────
@@ -48,24 +44,18 @@ export interface OrchestratorResult {
  * 3. Populates delegation chains for each hop (P8.1 + P8.2)
  */
 export async function orchestrate(input: OrchestratorInput): Promise<OrchestratorResult> {
-  const { intent, rootDelegationHash, subDelegationHash, reDelegationHash, demoMode } = input
+  const { intent, rootDelegationHash, subDelegationHash, reDelegationHash } = input
 
-  // Step 1: Route to agent chain
   const route = routeIntent(intent)
 
-  // Step 2: Build A2A ActionPlan
-  let plan: ActionPlan
-
-  if (demoMode) {
-    plan = mockA2APlan(intent, rootDelegationHash, subDelegationHash, reDelegationHash)
-  } else {
-    plan = await parseA2AIntent(
-      intent,
-      rootDelegationHash,
-      subDelegationHash,
-      reDelegationHash,
-    )
-  }
+  const sessionId = input.sessionId ?? `a2a_${Date.now()}`
+  const plan = await parseA2AIntent(
+    intent,
+    rootDelegationHash,
+    subDelegationHash,
+    reDelegationHash,
+    sessionId,
+  )
 
   return {
     plan,

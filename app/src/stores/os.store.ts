@@ -1,6 +1,7 @@
 'use client'
 
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Delegation, OSKernelConfig, OSStatus, Policy } from '@/types'
 
 interface OSStore {
@@ -16,15 +17,28 @@ interface OSStore {
   setActivationStep: (step: number) => void
 }
 
-export const useOsStore = create<OSStore>((set) => ({
-  osStatus: 'inactive',
-  osKernel: null,
-  rootDelegation: null,
-  policy: null,
-  activationStep: 0,
-  setOsStatus: (osStatus) => set({ osStatus }),
-  setKernel: (osKernel) => set({ osKernel }),
-  setRootDelegation: (rootDelegation) => set({ rootDelegation }),
-  setPolicy: (policy) => set({ policy }),
-  setActivationStep: (activationStep) => set({ activationStep }),
-}))
+export const useOsStore = create<OSStore>()(
+  persist(
+    (set) => ({
+      osStatus: 'inactive',
+      osKernel: null,
+      rootDelegation: null,
+      policy: null,
+      activationStep: 0,
+      setOsStatus: (osStatus) => set({ osStatus }),
+      setKernel: (osKernel) => set({ osKernel }),
+      setRootDelegation: (rootDelegation) => set({ rootDelegation }),
+      setPolicy: (policy) => set({ policy }),
+      setActivationStep: (activationStep) => set({ activationStep }),
+    }),
+    {
+      name: 'forgeos-os',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        osStatus: state.osStatus,
+        rootDelegation: state.rootDelegation,
+        activationStep: state.activationStep,
+      }),
+    },
+  ),
+)

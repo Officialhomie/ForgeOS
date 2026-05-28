@@ -6,10 +6,10 @@ import type { RunStatus, Hash } from '@/types'
 // ─── STEPS ────────────────────────────────────────────────────────────────────
 
 const STEPS = [
-  { label: 'Venice Parse', description: 'Intent parsed by AI' },
-  { label: 'Delegation Check', description: 'Caveats validated' },
-  { label: '1Shot Relay', description: 'UserOp submitted' },
-  { label: 'Confirmed', description: 'On-chain finalized' },
+  { label: 'Understand', description: 'Your request is read' },
+  { label: 'Check limits', description: 'Spending rules verified' },
+  { label: 'Send', description: 'Action submitted' },
+  { label: 'Done', description: 'Confirmed on network' },
 ] as const
 
 type StepState = 'done' | 'active' | 'pending' | 'failed'
@@ -265,32 +265,32 @@ export function A2AChainVisualizer({
   return (
     <div className="rounded-xl border border-forge-border bg-forge-surface p-5">
       <p className="mb-4 text-xs font-medium text-forge-text-muted">
-        A2A delegation chain · 2 hops
+        Permission handoff · 2 steps
       </p>
       <div className="flex items-start">
         <A2ANodeDot
           status={state.hop0}
-          label="OSKernel"
-          sublabel="Root delegation"
+          label="Your account"
+          sublabel="Main permission"
         />
         <A2AConnector
           filled={state.hop1 === 'done' || state.hop1 === 'active'}
-          label={defiHash ? `sub-del ${truncateAddress(defiHash, 3)}` : 'sub-delegation'}
+          label={defiHash ? `step 1 · ${truncateAddress(defiHash, 3)}` : 'step 1'}
         />
         <A2ANodeDot
           status={state.hop1}
-          label="DeFiAgent"
-          sublabel="Hop 1"
+          label="Agent A"
+          sublabel="First handoff"
           hash={defiHash}
         />
         <A2AConnector
           filled={state.hop2 === 'done' || state.hop2 === 'active'}
-          label={redelHash ? `re-del ${truncateAddress(redelHash, 3)}` : 're-delegation'}
+          label={redelHash ? `step 2 · ${truncateAddress(redelHash, 3)}` : 'step 2'}
         />
         <A2ANodeDot
           status={state.hop2}
-          label="PaymentAgent"
-          sublabel="Hop 2"
+          label="Agent B"
+          sublabel="Final handoff"
           hash={redelHash}
         />
       </div>

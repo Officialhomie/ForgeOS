@@ -1,48 +1,30 @@
 /**
- * POST /api/a2a/execute
- *
- * End-to-end A2A orchestration:
- *  1. Accept user intent + signed delegation hashes
- *  2. Parse intent with Venice AI (orchestrator)
- *  3. Build 2-hop ActionPlan with delegation chains
- *  4. Submit UserOps to 1Shot relay (with webhook)
- *  5. Return taskId immediately; status arrives via /api/webhooks/1shot
- *
- * Track evidence:
- *  - Best A2A Coordination: 2-hop chain, OSKernel→DeFiAgent→PaymentAgent
- *  - Best Venice AI: parseA2AIntent calls Venice chat + embeddings
- *  - Best 1Shot: caps → fee → send7710Transaction with webhook URL
- *  - Best x402+7710: delegation proof per UserOp
+ * POST /api/a2a/execute — Venice orchestration + validated UserOps + 1Shot.
  */
 
 import { NextResponse } from 'next/server'
-import { isDemoMode } from '@/lib/demo'
 import { orchestrate } from '@/services/orchestrator'
 import { buildActionGraph, validateActionGraph } from '@/services/execution-engine/action-graph'
-import { buildUserOps, buildDemoUserOps } from '@/services/execution-engine/userop-builder'
+import {
+  buildAndValidateUserOps,
+  delegationProofErrorResponse,
+} from '@/lib/delegation/proof-validation'
 import { send7710Transaction } from '@/lib/oneshot/client'
 import { taskStore } from '@/lib/oneshot/task-store'
 import { activityEmitter } from '@/lib/events/activity-emitter'
+import { createFlowTimer } from '@/lib/telemetry/flow-timer'
 import { APP_URL, ONESHOT } from '@/lib/constants'
-import { getVeniceClient } from '@/lib/venice/client'
+import { getVeniceClient, hasAgentWallet } from '@/lib/venice/client'
 import type { ActionPlan, Delegation, Hash, ActivityEvent } from '@/types'
-
-// ─── REQUEST BODY ─────────────────────────────────────────────────────────────
 
 interface A2AExecuteRequest {
   intent: string
-  /** Root delegation hash (User → OSKernel) */
   rootDelegationHash: Hash
-  /** Sub-delegation hash (OSKernel → DeFiAgent) */
   subDelegationHash: Hash
-  /** Re-delegation hash (DeFiAgent → PaymentAgent) */
   reDelegationHash: Hash
-  /** Signed delegation objects (for on-chain proof inclusion) */
   signedDelegations?: Delegation[]
   userAddress?: string
 }
-
-// ─── HANDLER ──────────────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
   let body: A2AExecuteRequest
@@ -78,70 +60,9 @@ export async function POST(request: Request) {
     )
   }
 
-  // ── Demo mode ──────────────────────────────────────────────────────────────
-
-  if (isDemoMode()) {
-    const { plan } = await orchestrate({
-      intent,
-      rootDelegationHash,
-      subDelegationHash,
-      reDelegationHash,
-      demoMode: true,
-    })
-
-    const taskId = `demo-a2a-${Date.now()}`
-    const mockTxHash1 = `0xA2AHOP1${Date.now().toString(16).padStart(56, '0')}` as `0x${string}`
-    const mockTxHash2 = `0xA2AHOP2${Date.now().toString(16).padStart(56, '0')}` as `0x${string}`
-
-    taskStore.create(taskId)
-    taskStore.update(taskId, 'Confirmed', mockTxHash2)
-
-    // Emit hop 1 confirmed event
-    const hop1Activity: ActivityEvent = {
-      id: `a2a_hop1_${taskId}`,
-      type: 'delegation_issued',
-      agentId: 'defi-rebalancer',
-      title: 'A2A Hop 1 — DeFiAgent',
-      description: plan.actions[0]?.humanDescription ?? 'DeFiAgent delegated',
-      amount: plan.actions[0]?.value ?? null,
-      txHash: mockTxHash1,
-      delegationHash: subDelegationHash,
-      timestamp: Math.floor(Date.now() / 1000),
-      status: 'confirmed',
-    }
-    activityEmitter.emitActivity(hop1Activity)
-
-    // Emit hop 2 confirmed event
-    const hop2Activity: ActivityEvent = {
-      id: `a2a_hop2_${taskId}`,
-      type: 'agent_run_confirmed',
-      agentId: 'payment-executor',
-      title: 'A2A Hop 2 — PaymentAgent',
-      description: plan.actions[1]?.humanDescription ?? 'PaymentAgent executed',
-      amount: plan.actions[1]?.value ?? null,
-      txHash: mockTxHash2,
-      delegationHash: reDelegationHash,
-      timestamp: Math.floor(Date.now() / 1000),
-      status: 'confirmed',
-    }
-    activityEmitter.emitActivity(hop2Activity)
-
-    return NextResponse.json({
-      success: true,
-      taskId,
-      plan: serialisePlan(plan),
-      primaryAgent: 'defi-rebalancer',
-      secondaryAgent: 'payment-executor',
-      isA2A: true,
-      hops: 2,
-    })
-  }
-
-  // ── Live mode ──────────────────────────────────────────────────────────────
-
-  if (!process.env.AGENT_WALLET_KEY) {
+  if (!hasAgentWallet()) {
     return NextResponse.json(
-      { success: false, error: 'AGENT_WALLET_KEY not configured', code: 'VENICE_ERROR' },
+      { success: false, error: 'Agent wallet not configured', code: 'VENICE_ERROR' },
       { status: 503 },
     )
   }
@@ -153,22 +74,20 @@ export async function POST(request: Request) {
     )
   }
 
+  const timer = createFlowTimer('a2a_execute')
+
   try {
-    // Step 1: Build A2A plan via Venice orchestrator
+    timer.checkpoint('venice_start')
     const { plan, primaryAgent, secondaryAgent, isA2A } = await orchestrate({
       intent,
       rootDelegationHash,
       subDelegationHash,
       reDelegationHash,
     })
+    timer.checkpoint('venice_end')
 
-    // Step 2: Fire embeddings call in background (Venice multi-endpoint track)
-    const venice = getVeniceClient()
-    void venice.embeddings({ input: intent }).catch(() => {
-      // Non-critical
-    })
+    void getVeniceClient().then((v) => v.embeddings({ input: intent })).catch(() => {})
 
-    // Step 3: Validate the action graph
     const graphErrors = validateActionGraph(plan)
     if (graphErrors.length > 0) {
       return NextResponse.json(
@@ -177,28 +96,28 @@ export async function POST(request: Request) {
       )
     }
 
-    // Step 4: Build ordered execution graph
-    const _graph = buildActionGraph(plan) // validates topological order
+    buildActionGraph(plan)
 
-    // Step 5: Build UserOps (one per hop, with delegation proofs)
-    const userOps = buildUserOps({
+    timer.checkpoint('build_start')
+    const userOps = buildAndValidateUserOps({
       actions: plan.actions,
       signedDelegations,
       senderAddress: userAddress,
     })
+    timer.checkpoint('build_end')
 
-    // Step 6: Submit to 1Shot relay with webhook
     const webhookUrl = process.env.ONESHOT_WEBHOOK_URL ?? `${APP_URL}/api/webhooks/1shot`
 
+    timer.checkpoint('oneshot_start')
     const { taskId } = await send7710Transaction({
       chainId: ONESHOT.CHAIN_ID,
       userOps,
       destinationUrl: webhookUrl,
     })
+    timer.checkpoint('oneshot_end')
 
     taskStore.create(taskId)
 
-    // Emit pending activity
     const pendingActivity: ActivityEvent = {
       id: `a2a_${taskId}`,
       type: 'delegation_issued',
@@ -221,8 +140,13 @@ export async function POST(request: Request) {
       secondaryAgent,
       isA2A,
       hops: plan.actions.length,
+      timing: timer.end(),
     })
   } catch (e) {
+    const proofErr = delegationProofErrorResponse(e)
+    if (proofErr) {
+      return NextResponse.json(proofErr, { status: 422 })
+    }
     const msg = e instanceof Error ? e.message : 'Orchestration error'
     return NextResponse.json(
       { success: false, error: msg, code: 'UNKNOWN' },
@@ -230,8 +154,6 @@ export async function POST(request: Request) {
     )
   }
 }
-
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 function serialisePlan(plan: ActionPlan) {
   return {

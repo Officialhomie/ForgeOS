@@ -13,9 +13,12 @@ export const BASE_CHAIN_ID = VENICE_CHAIN_ID satisfies ChainId
 export const NAV_ITEMS = [
   { href: '/dashboard', label: 'Overview', icon: 'LayoutDashboard' },
   { href: '/dashboard/agents', label: 'Agents', icon: 'Bot' },
-  { href: '/dashboard/delegations', label: 'Delegations', icon: 'GitBranch' },
-  { href: '/dashboard/treasury', label: 'Treasury', icon: 'Wallet' },
+  { href: '/dashboard/delegations', label: 'Permissions', icon: 'GitBranch' },
+  { href: '/dashboard/treasury', label: 'Spending', icon: 'Wallet' },
   { href: '/dashboard/subscriptions', label: 'Subscriptions', icon: 'Repeat' },
+  { href: '/dashboard/builder', label: 'Builder', icon: 'Hammer' },
+  { href: '/dashboard/status', label: 'Status', icon: 'Activity' },
+  { href: '/marketplace', label: 'Marketplace', icon: 'Store' },
 ] as const
 
 export const VENICE = {

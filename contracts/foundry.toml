@@ -32,4 +32,5 @@ bracket_spacing = true
 base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
 
 [etherscan]
+sepolia = { key = "${ETHERSCAN_API_KEY}", url = "https://api-sepolia.etherscan.io/api" }
 base-sepolia = { key = "${ETHERSCAN_API_KEY}", url = "https://api-sepolia.basescan.org/api" }

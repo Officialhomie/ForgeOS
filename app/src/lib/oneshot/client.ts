@@ -74,14 +74,18 @@ export async function send7710Transaction(args: {
   destinationUrl?: string
 }): Promise<RelaySubmitResult> {
   const caps = await getRelayCapabilities(args.chainId)
-  const token = caps.acceptedTokens[0]
-  if (!token) throw new Error('No accepted payment tokens from 1Shot')
+  const token = caps.acceptedTokens?.[0]
+  if (!token) {
+    throw new Error(
+      'Gasless relay is not available on this network right now.',
+    )
+  }
 
   const fee = await getRelayFeeData(args.chainId, token)
   const feeAmount =
     fee.convertedFee > fee.minFee ? fee.convertedFee : fee.minFee
 
-  return jsonRpc<RelaySubmitResult>('relayer_send7710Transaction', [
+  const params = [
     {
       userOps: args.userOps,
       paymentToken: token,
@@ -89,5 +93,24 @@ export async function send7710Transaction(args: {
       context: fee.context,
       destinationUrl: args.destinationUrl,
     },
-  ])
+  ]
+
+  try {
+    return await jsonRpc<RelaySubmitResult>('relayer_send7710Transaction', params)
+  } catch (first) {
+    await new Promise((r) => setTimeout(r, 1500))
+    try {
+      return await jsonRpc<RelaySubmitResult>('relayer_send7710Transaction', params)
+    } catch (second) {
+      const err = second instanceof Error ? second : first
+      const retryable = /congest|timeout|rate|503|502/i.test(String(err))
+      if (retryable) {
+        const message = err instanceof Error ? err.message : String(err)
+        const e = new Error(message)
+        ;(e as Error & { retryAfter?: number }).retryAfter = 5
+        throw e
+      }
+      throw err
+    }
+  }
 }

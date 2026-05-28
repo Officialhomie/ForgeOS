@@ -3,57 +3,64 @@
  *
  * Converts a PlannedAction (with its delegation chain) into a 1Shot-compatible
  * UserOperation object. Each UserOp includes the delegation proof for that hop.
- *
- * Track evidence:
- *  - Best 1Shot: UserOps submitted via relayer_send7710Transaction
- *  - Best x402+7710: delegation proof embedded per UserOp
- *  - Best A2A: each hop in the chain has its own delegation proof
  */
 
 import type { PlannedAction, Delegation, Hash } from '@/types'
+import { encodeRedeemDelegations, getRedeemDelegationsSelector } from '@/lib/delegation/encode-redeem'
+import {
+  DelegationProofError,
+  resolveProofsForAction,
+} from '@/lib/delegation/proof-bundle'
+import { slice } from 'viem'
 
-// ─── USEROP SHAPE ─────────────────────────────────────────────────────────────
-
-/** Shape expected by 1Shot's relayer_send7710Transaction */
 export interface UserOp {
   sender?: string
   callData: `0x${string}`
   target: string
-  value: string         // bigint serialised as string
+  value: string
   nonce: number
-  /** Ordered chain of delegation hashes for this hop */
   delegationChain: Hash[]
-  /** Full signed delegation objects (for on-chain proof verification) */
   delegationProofs: Delegation[]
 }
 
-// ─── BUILDER ─────────────────────────────────────────────────────────────────
-
 export interface BuildUserOpsOptions {
   actions: PlannedAction[]
-  /** All signed delegations available — builder matches by hash */
   signedDelegations: Delegation[]
-  /** Smart account address (sender of the UserOps) */
   senderAddress?: string
 }
 
-/**
- * Build one UserOp per PlannedAction, in execution order.
- *
- * For a 2-hop A2A plan:
- *  - UserOp[0] embeds the hop-1 delegation proof (OSKernel → DeFiAgent)
- *  - UserOp[1] embeds the hop-2 delegation proof (DeFiAgent → PaymentAgent)
- */
+const allowRawCalldata =
+  process.env.ALLOW_RAW_CALLDATA === 'true' ||
+  process.env.NEXT_PUBLIC_ALLOW_RAW_CALLDATA === 'true'
+
 export function buildUserOps(opts: BuildUserOpsOptions): UserOp[] {
+  const redeemSelector = getRedeemDelegationsSelector()
+
   return opts.actions.map((action, i) => {
-    // Find signed delegation objects that match this hop's chain
-    const proofs = action.delegationChain
-      .map((hash) => opts.signedDelegations.find((d) => d.hash === hash))
-      .filter((d): d is Delegation => d !== undefined)
+    let proofs: Delegation[] = []
+    let callData: `0x${string}`
+
+    if (action.delegationChain.length > 0) {
+      proofs = resolveProofsForAction(action.delegationChain, opts.signedDelegations)
+      callData = encodeRedeemDelegations(
+        proofs,
+        action.target,
+        action.calldata,
+        action.value,
+      )
+    } else if (allowRawCalldata) {
+      callData = action.calldata
+    } else {
+      throw new DelegationProofError(`UserOp[${i}] has no delegation chain`)
+    }
+
+    if (action.delegationChain.length > 0 && slice(callData, 0, 4) !== redeemSelector) {
+      throw new DelegationProofError(`UserOp[${i}] failed redeemDelegations encoding`)
+    }
 
     return {
       sender: opts.senderAddress,
-      callData: action.calldata,
+      callData,
       target: action.target,
       value: action.value.toString(),
       nonce: i,
@@ -63,39 +70,21 @@ export function buildUserOps(opts: BuildUserOpsOptions): UserOp[] {
   })
 }
 
-// ─── DEMO USER OPS ────────────────────────────────────────────────────────────
-
-/**
- * Build mock UserOps for demo mode.
- * Returns properly shaped objects with placeholder data.
- */
-export function buildDemoUserOps(
-  actions: PlannedAction[],
-  senderAddress?: string,
-): UserOp[] {
-  return actions.map((action, i) => ({
-    sender: senderAddress ?? '0xDemoSender0000000000000000000000000000000',
-    callData: action.calldata,
-    target: action.target,
-    value: action.value.toString(),
-    nonce: i,
-    delegationChain: action.delegationChain,
-    delegationProofs: [],
-  }))
-}
-
-// ─── PROOF VALIDATION ─────────────────────────────────────────────────────────
-
-/**
- * Validate that UserOps have required delegation proofs.
- * Returns error strings for any missing proofs.
- */
 export function validateUserOps(ops: UserOp[]): string[] {
   const errors: string[] = []
+  const redeemSelector = getRedeemDelegationsSelector()
+
   for (let i = 0; i < ops.length; i++) {
     const op = ops[i]
     if (op.delegationChain.length === 0) {
       errors.push(`UserOp[${i}] has no delegation chain`)
+      continue
+    }
+    if (op.delegationProofs.length !== op.delegationChain.length) {
+      errors.push(`UserOp[${i}] proof count mismatch`)
+    }
+    if (slice(op.callData, 0, 4) !== redeemSelector) {
+      errors.push(`UserOp[${i}] callData is not redeemDelegations`)
     }
   }
   return errors

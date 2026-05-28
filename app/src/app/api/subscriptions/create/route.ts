@@ -13,7 +13,6 @@
  */
 
 import { NextResponse } from 'next/server'
-import { isDemoMode } from '@/lib/demo'
 import { createSubscriptionDelegation, subscriptionDelegationToForge } from '@/lib/delegation/createSubscriptionDelegation'
 import { send7710Transaction } from '@/lib/oneshot/client'
 import { taskStore } from '@/lib/oneshot/task-store'
@@ -72,88 +71,6 @@ export async function POST(request: Request) {
 
   const amountBigInt = BigInt(amount)
 
-  // ── Demo mode ──────────────────────────────────────────────────────────────
-  if (isDemoMode()) {
-    const now = Math.floor(Date.now() / 1000)
-    const taskId = `demo-sub-create-${Date.now()}`
-    const mockHash = `0xSUB${Date.now().toString(16).padStart(61, '0')}` as `0x${string}`
-
-    taskStore.create(taskId)
-    taskStore.update(taskId, 'Confirmed', mockHash)
-
-    const subscription: Subscription = {
-      id: `sub_${Date.now()}`,
-      name,
-      description,
-      recipient,
-      amount: amountBigInt,
-      frequencySeconds: Math.floor(durationSeconds / maxPayments),
-      maxPayments,
-      paymentsRemaining: maxPayments,
-      status: 'active',
-      delegation: {
-        hash: mockHash,
-        delegate: delegateAddress,
-        delegator: delegatorAddress,
-        authority: parentDelegationHash,
-        caveats: [
-          {
-            enforcer: CONTRACTS.usdc,
-            enforcerName: 'TimestampEnforcer',
-            terms: '0x',
-            decodedTerms: { validAfter: now, validBefore: now + durationSeconds },
-            humanReadable: `Valid for ${Math.floor(durationSeconds / 86400)} days`,
-          },
-          {
-            enforcer: CONTRACTS.usdc,
-            enforcerName: 'ERC20TransferAmountEnforcer',
-            terms: '0x',
-            decodedTerms: { maxAmount: amount },
-            humanReadable: `Max ${Number(amountBigInt) / 1_000_000} USDC per payment`,
-          },
-          {
-            enforcer: CONTRACTS.usdc,
-            enforcerName: 'LimitedCallsEnforcer',
-            terms: '0x',
-            decodedTerms: { limit: maxPayments },
-            humanReadable: `Max ${maxPayments} payments`,
-          },
-        ],
-        salt: '0x0000000000000000000000000000000000000000000000000000000000000001',
-        signature: '0x' as `0x${string}`,
-        hop: 'sub',
-        status: 'active',
-        issuedAt: now,
-        lastUsedAt: null,
-        agentId,
-        parentDelegation: null,
-        children: [],
-      },
-      nextPaymentAt: now + Math.floor(durationSeconds / maxPayments),
-      lastPaymentAt: null,
-      lastPaymentTx: null,
-      createdAt: now,
-      agentId: agentId as Subscription['agentId'],
-    }
-
-    const activity: ActivityEvent = {
-      id: `sub_create_${taskId}`,
-      type: 'delegation_issued',
-      agentId: agentId as ActivityEvent['agentId'],
-      title: `Subscription created: ${name}`,
-      description: `${Number(amountBigInt) / 1_000_000} USDC × ${maxPayments} cycles (demo)`,
-      amount: amountBigInt,
-      txHash: mockHash,
-      delegationHash: mockHash,
-      timestamp: Math.floor(Date.now() / 1000),
-      status: 'confirmed',
-    }
-    activityEmitter.emitActivity(activity)
-
-    return NextResponse.json({ success: true, taskId, subscription, delegationHash: mockHash })
-  }
-
-  // ── Live mode ──────────────────────────────────────────────────────────────
   try {
     const { delegation, hash } = await createSubscriptionDelegation({
       delegator: delegatorAddress,

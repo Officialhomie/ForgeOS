@@ -12,8 +12,6 @@ import {
 import { AddressDisplay } from '@/components/ui/AddressDisplay'
 import { useActivationContext } from '@/providers/ActivationProvider'
 import { CONTRACTS } from '@/lib/contracts'
-import { forgeChain } from '@/lib/wagmi/chains'
-import { ACTIVATION_CHAIN_ID } from '@/types/activation'
 import { Coins, Network } from 'lucide-react'
 import { useOsStore } from '@/stores/os.store'
 
@@ -23,6 +21,9 @@ export function StepFour_Confirm() {
   const {
     canProceed,
     fundTreasury,
+    cancelFunding,
+    resetActivation,
+    ensureForgeNetwork,
     fundAmountUsdc,
     setFundAmountUsdc,
     phase,
@@ -34,6 +35,7 @@ export function StepFour_Confirm() {
   const gated = !canProceed('fund')
   const busy = phase === 'funding'
   const done = osStatus === 'active'
+  const errored = phase === 'error'
 
   return (
     <Card className="border-forge-border-subtle bg-forge-surface/80">
@@ -42,40 +44,38 @@ export function StepFour_Confirm() {
           <Coins className="size-5" />
         </div>
         <CardTitle className="font-[family-name:var(--font-display)] text-xl">
-          Fund agent treasury
+          Add funds
         </CardTitle>
         <CardDescription>
-          Kernel, registry, and treasury all live on Ethereum Sepolia (chain{' '}
-          {forgeChain.id}). USDC here funds agent operations and test x402 flows.
+          Your agents need a small balance to pay for the actions they take. You set the
+          amount — they can never spend more than you put in.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-lg border border-forge-border-subtle p-3">
             <p className="flex items-center gap-1 text-xs text-forge-text-muted">
-              <Network className="size-3" /> OS kernel
+              <Network className="size-3" /> ForgeOS system
             </p>
             <AddressDisplay address={CONTRACTS.osKernel} className="mt-1" />
-            <p className="mt-1 text-[10px] text-forge-text-subtle">
-              Chain {ACTIVATION_CHAIN_ID}
-            </p>
           </div>
           <div className="rounded-lg border border-forge-border-subtle p-3">
             <p className="flex items-center gap-1 text-xs text-forge-text-muted">
-              <Network className="size-3" /> Agent treasury
+              <Network className="size-3" /> Your spending pool
             </p>
             <AddressDisplay address={CONTRACTS.agentTreasury} className="mt-1" />
-            <p className="mt-1 text-[10px] text-forge-text-subtle">
-              Chain {ACTIVATION_CHAIN_ID}
-            </p>
           </div>
         </div>
 
         {!isForgeChain && (
           <p className="rounded-lg border border-forge-warning/40 bg-forge-warning/10 px-3 py-2 text-xs text-forge-warning">
-            Switch to Ethereum Sepolia (chain 11155111) in MetaMask to fund the treasury with USDC.
+            Please switch to Ethereum Sepolia in MetaMask before adding funds.
           </p>
         )}
+
+        <p className="rounded-lg border border-forge-info/30 bg-forge-info/10 px-3 py-2 text-xs text-forge-text-muted">
+          You'll need a small amount of Sepolia USDC in your wallet to continue. This is what your agents will spend when they take actions.
+        </p>
 
         <label className="block space-y-1">
           <span className="text-xs text-forge-text-muted">USDC amount</span>
@@ -98,21 +98,36 @@ export function StepFour_Confirm() {
 
         {fundTxHash && (
           <p className="text-xs text-forge-text-muted">
-            Fund tx: <span className="font-mono">{fundTxHash.slice(0, 18)}…</span>
+            Transaction submitted — waiting for confirmation…
           </p>
         )}
 
         <div className="flex flex-wrap gap-2">
           <Button
             variant="default"
-            disabled={gated || busy || done}
+            disabled={gated || busy || done || !isForgeChain}
             onClick={() => void fundTreasury()}
           >
-            {busy ? 'Funding…' : done ? 'Funded' : 'Fund treasury'}
+            {busy ? 'Confirm in MetaMask…' : done ? 'Funds added' : 'Add funds'}
           </Button>
+          {!isForgeChain && !busy && (
+            <Button variant="outline" onClick={() => void ensureForgeNetwork()}>
+              Switch network
+            </Button>
+          )}
+          {busy && (
+            <Button variant="outline" onClick={cancelFunding}>
+              Cancel
+            </Button>
+          )}
           {done && (
             <Button variant="secondary" onClick={() => router.push('/dashboard')}>
               Open dashboard
+            </Button>
+          )}
+          {(done || errored || busy) && (
+            <Button variant="ghost" onClick={resetActivation}>
+              Start over
             </Button>
           )}
         </div>

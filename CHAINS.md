@@ -15,11 +15,11 @@ Default for the app, ERC-7715 Flask, and 1Shot relay.
 
 | Contract | Address | Etherscan |
 |----------|---------|-----------|
-| ForgeOSRegistry | `0xB4FE452e905Cc5BF7C02d57f32fd3fFB3Ca5Ab6a` | [view](https://sepolia.etherscan.io/address/0xB4FE452e905Cc5BF7C02d57f32fd3fFB3Ca5Ab6a) |
-| OSKernel | `0x3E65dD7AB6BeF1Ffe5CaC683D401621b400988aB` | [view](https://sepolia.etherscan.io/address/0x3E65dD7AB6BeF1Ffe5CaC683D401621b400988aB) |
-| AgentTreasury | `0xAfdA3dCf4BF42cF9C69bB14BAe262ACd5c75C2D1` | [view](https://sepolia.etherscan.io/address/0xAfdA3dCf4BF42cF9C69bB14BAe262ACd5c75C2D1) |
+| ForgeOSRegistry | `0x4668B4Dd600FB4404783a9C73B6b4fcb71e78347` | [view](https://sepolia.etherscan.io/address/0x4668B4Dd600FB4404783a9C73B6b4fcb71e78347) |
+| OSKernel | `0xcFC6BECB0054D6e313a88c70CcE1d477D8752382` | [view](https://sepolia.etherscan.io/address/0xcFC6BECB0054D6e313a88c70CcE1d477D8752382) |
+| AgentTreasury | `0xe0DD408BE8cb3Dfe6441FEfE1e209E886F48071A` | [view](https://sepolia.etherscan.io/address/0xe0DD408BE8cb3Dfe6441FEfE1e209E886F48071A) |
 
-Deploy cost: **~0.00313 ETH** total (block 10926230).
+Deploy cost: **~0.00419 ETH** total (block 10934090).
 
 **Note:** `OSKernel.owner()` was set to Foundry’s `DefaultSender` (`0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38`) in simulation; on-chain owner may differ from deployer `0x9aC2d5…` — check Etherscan before owner-only actions.
 

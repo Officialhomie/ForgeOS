@@ -2,27 +2,23 @@
  * POST /api/execute
  *
  * Submit an approved ActionPlan as UserOps via 1Shot relay.
- * Returns taskId immediately; status arrives via webhook → SSE.
- *
- * Track evidence:
- *  - Best 1Shot: caps → fee → send7710Transaction with webhook URL
- *  - Best A2A: delegation chain proof included per action
- *  - Best x402+7710: delegation proof in userOp
  */
 
 import { NextResponse } from 'next/server'
-import { isDemoMode } from '@/lib/demo'
 import { send7710Transaction } from '@/lib/oneshot/client'
+import {
+  buildAndValidateUserOps,
+  delegationProofErrorResponse,
+} from '@/lib/delegation/proof-validation'
+import { createFlowTimer } from '@/lib/telemetry/flow-timer'
 import { taskStore } from '@/lib/oneshot/task-store'
 import { activityEmitter } from '@/lib/events/activity-emitter'
 import { APP_URL, ONESHOT } from '@/lib/constants'
 import type { ActionPlan, Delegation, ChainId, ActivityEvent } from '@/types'
 
-// ─── REQUEST BODY ─────────────────────────────────────────────────────────────
-
 interface ExecuteRequest {
   actionPlan: ActionPlan & {
-    estimatedCost: string   // bigint serialised as string by /api/command
+    estimatedCost: string
     estimatedGas: string
     actions: Array<Omit<ActionPlan['actions'][number], 'value'> & { value: string }>
   }
@@ -30,8 +26,6 @@ interface ExecuteRequest {
   userAddress?: string
   chainId?: ChainId
 }
-
-// ─── HANDLER ──────────────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
   let body: ExecuteRequest
@@ -50,37 +44,6 @@ export async function POST(request: Request) {
     )
   }
 
-  // ── Demo mode ──────────────────────────────────────────────────────────────
-  if (isDemoMode()) {
-    const taskId = `demo-exec-${Date.now()}`
-    const mockTxHash = `0xEXEC${Date.now().toString(16).padStart(60, '0')}` as `0x${string}`
-
-    taskStore.create(taskId)
-    taskStore.update(taskId, 'Confirmed', mockTxHash)
-
-    const activity: ActivityEvent = {
-      id: `exec_${taskId}`,
-      type: 'agent_run_confirmed',
-      agentId: actionPlan.actions[0]?.agentId ?? null,
-      title: 'Action executed (demo)',
-      description: actionPlan.summary,
-      amount: BigInt(actionPlan.estimatedCost),
-      txHash: mockTxHash,
-      delegationHash: actionPlan.actions[0]?.delegationChain?.[0] ?? null,
-      timestamp: Math.floor(Date.now() / 1000),
-      status: 'confirmed',
-    }
-    activityEmitter.emitActivity(activity)
-
-    return NextResponse.json({
-      success: true,
-      taskId,
-      userOpHashes: [mockTxHash],
-      estimatedConfirmation: 0,
-    })
-  }
-
-  // ── Live mode ──────────────────────────────────────────────────────────────
   if (!process.env.ONESHOT_API_KEY) {
     return NextResponse.json(
       { success: false, error: 'ONESHOT_API_KEY not configured', code: 'ONESHOT_ERROR' },
@@ -88,33 +51,30 @@ export async function POST(request: Request) {
     )
   }
 
+  const timer = createFlowTimer('execute')
+
   try {
-    // Build one UserOp per action.
-    // In production these would be fully constructed ERC-4337 UserOps signed
-    // with the Smart Accounts Kit. For now we pass the action data and let
-    // the 1Shot relayer encode them.
-    const userOps = actionPlan.actions.map((action, i) => ({
-      sender: body.userAddress,
-      callData: action.calldata,
-      target: action.target,
-      value: action.value,
-      // Delegation proof: the ordered chain of signed delegation hashes
-      delegationChain: action.delegationChain,
-      // If a matching signed delegation was provided by the client, embed it
-      delegation: signedDelegations.find((d) =>
-        action.delegationChain.includes(d.hash),
-      ) ?? undefined,
-      nonce: i,
+    timer.checkpoint('build_start')
+    const normalizedActions = actionPlan.actions.map((a) => ({
+      ...a,
+      value: BigInt(a.value),
     }))
+    const userOps = buildAndValidateUserOps({
+      actions: normalizedActions,
+      signedDelegations,
+      senderAddress: body.userAddress,
+    })
+    timer.checkpoint('build_end')
 
-    const webhookUrl = process.env.ONESHOT_WEBHOOK_URL
-      ?? `${APP_URL}/api/webhooks/1shot`
+    const webhookUrl = process.env.ONESHOT_WEBHOOK_URL ?? `${APP_URL}/api/webhooks/1shot`
 
+    timer.checkpoint('oneshot_start')
     const { taskId } = await send7710Transaction({
       chainId,
       userOps,
       destinationUrl: webhookUrl,
     })
+    timer.checkpoint('oneshot_end')
 
     taskStore.create(taskId)
 
@@ -137,8 +97,13 @@ export async function POST(request: Request) {
       taskId,
       userOpHashes: userOps.map((_, i) => `0x${i}` as `0x${string}`),
       estimatedConfirmation: 15,
+      timing: timer.end(),
     })
   } catch (e) {
+    const proofErr = delegationProofErrorResponse(e)
+    if (proofErr) {
+      return NextResponse.json(proofErr, { status: 422 })
+    }
     const msg = e instanceof Error ? e.message : '1Shot relay error'
     return NextResponse.json(
       { success: false, error: msg, code: 'ONESHOT_ERROR' },

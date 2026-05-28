@@ -20,8 +20,6 @@ export function StepOne_Connect() {
     connectPending,
     connectError,
     phase,
-    demo,
-    skipDemoActivation,
     error,
     isForgeChain,
     chainId,
@@ -39,8 +37,8 @@ export function StepOne_Connect() {
           Connect your wallet
         </CardTitle>
         <CardDescription className="text-forge-text-muted">
-          ForgeOS uses MetaMask Smart Accounts. Your wallet becomes the root of your
-          agent permission system — no keys are ever shared with agents.
+          ForgeOS needs your MetaMask wallet to know who you are. Your wallet stays fully
+          in your control — nothing is shared with your agents.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -73,8 +71,7 @@ export function StepOne_Connect() {
 
         {isConnected && !isForgeChain && (
           <p className="rounded-lg border border-forge-warning/40 bg-forge-warning/10 px-3 py-2 text-xs text-forge-warning">
-            Wrong network (chain {chainId}). Approve switching to Ethereum Sepolia
-            (chain 11155111) in MetaMask.
+            You're on the wrong network. Please approve switching to Ethereum Sepolia in MetaMask to continue.
           </p>
         )}
 
@@ -82,11 +79,6 @@ export function StepOne_Connect() {
           {!isConnected && (
             <Button onClick={() => void connectWallet()} disabled={busy}>
               {busy ? 'Connecting…' : 'Connect MetaMask'}
-            </Button>
-          )}
-          {demo && (
-            <Button variant="outline" onClick={skipDemoActivation}>
-              Skip to dashboard (demo)
             </Button>
           )}
         </div>

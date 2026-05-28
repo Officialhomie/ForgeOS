@@ -73,14 +73,14 @@ export function TopUpModal({
           <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-forge-orange/15 text-forge-orange">
             <Coins className="size-5" />
           </div>
-          <CardTitle id="topup-title">Top up treasury</CardTitle>
+          <CardTitle id="topup-title">Add funds</CardTitle>
           <CardDescription>
-            Add USDC on Ethereum Sepolia (chain {forgeChain.id}) via 1Shot relay.
+            Move USDC into your agents&apos; spending pool so they can pay for tasks.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="rounded-lg border border-forge-info/30 bg-forge-info/10 px-3 py-2 text-xs text-forge-text-muted">
-            Use Ethereum Sepolia USDC from a faucet (sepolia.etherscan.io), then fund AgentTreasury.
+            On testnet, you may need free test USDC from a faucet before adding funds here.
           </p>
           <label className="block space-y-1">
             <span className="text-xs text-forge-text-muted">USDC amount</span>

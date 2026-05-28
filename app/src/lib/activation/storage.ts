@@ -1,24 +1,10 @@
-import type { ActivationPersistedState } from '@/types/activation'
+/**
+ * @deprecated All activation state is now managed by useActivationStore (Zustand persist).
+ * This file is kept as a thin stub so any lingering imports compile without errors.
+ * Remove this file once all callers have been updated.
+ */
 
-const STORAGE_KEY = 'forgeos_activation_v1'
-
-export function loadActivationState(): ActivationPersistedState | null {
-  if (typeof window === 'undefined') return null
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as ActivationPersistedState
-  } catch {
-    return null
-  }
-}
-
-export function saveActivationState(state: ActivationPersistedState): void {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-}
-
+/** @deprecated Use useActivationStore.getState().reset() */
 export function clearActivationState(): void {
-  if (typeof window === 'undefined') return
-  localStorage.removeItem(STORAGE_KEY)
+  // no-op — state is cleared via useActivationStore.getState().reset()
 }

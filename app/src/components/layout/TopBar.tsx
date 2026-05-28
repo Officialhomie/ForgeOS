@@ -8,22 +8,29 @@ import { AddressDisplay } from '@/components/ui/AddressDisplay'
 import { Button } from '@/components/ui/Button'
 import { NetworkIndicator } from '@/components/ui/NetworkIndicator'
 import { KillSwitchModal } from '@/components/KillSwitchModal'
-import { isDemoMode } from '@/lib/demo'
 import { useCommandStore } from '@/stores/command.store'
+import { Menu } from 'lucide-react'
 
-export function TopBar() {
+export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
   const { address, isConnected } = useAccount()
   const { connectWallet, isPending, error: connectError } = useForgeWalletConnect()
   const { disconnect } = useDisconnect()
-  const demo = isDemoMode()
   const openCommand = useCommandStore((s) => s.setOpen)
   const [killSwitchOpen, setKillSwitchOpen] = useState(false)
   const [localConnectError, setLocalConnectError] = useState<string | null>(null)
 
   return (
     <>
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-forge-border bg-forge-surface px-6">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-forge-border bg-forge-surface px-4 sm:px-6">
         <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={onOpenNav}
+            aria-label="Open navigation"
+            className="inline-flex items-center justify-center rounded-md border border-forge-border bg-forge-bg p-1.5 text-forge-text-subtle transition-colors hover:border-orange-500/50 hover:text-forge-text sm:hidden"
+          >
+            <Menu className="h-4 w-4" />
+          </button>
           <NetworkIndicator />
           <button
             onClick={() => openCommand(true)}
@@ -38,11 +45,9 @@ export function TopBar() {
             className="shrink-0"
             onClick={() => setKillSwitchOpen(true)}
           >
-            Kill Switch
+            Stop all agents
           </Button>
-          {demo ? (
-            <AddressDisplay address="0xUser0SmartAccount00000000000000000000000" />
-          ) : isConnected && address ? (
+          {isConnected && address ? (
             <>
               <AddressDisplay address={address} />
               <Button variant="ghost" onClick={() => disconnect()}>

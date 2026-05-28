@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from 'react'
 import { useAccount, useChainId } from 'wagmi'
-import { isDemoMode } from '@/lib/demo'
 import { forgeChain } from '@/lib/wagmi/chains'
 import { hasEthereumProvider } from '@/lib/wagmi/ethereum-provider'
 
@@ -17,7 +16,7 @@ export function ForgeChainGuard() {
   const warned = useRef(false)
 
   useEffect(() => {
-    if (isDemoMode() || !isConnected || chainId === forgeChain.id) {
+    if (!isConnected || chainId === forgeChain.id) {
       warned.current = false
       return
     }

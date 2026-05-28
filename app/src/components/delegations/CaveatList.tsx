@@ -46,7 +46,7 @@ export function CaveatList({
   className?: string
 }) {
   if (caveats.length === 0) {
-    return <p className={cn('text-xs text-forge-text-subtle', className)}>No caveats</p>
+    return <p className={cn('text-xs text-forge-text-subtle', className)}>No rules set</p>
   }
 
   return (
@@ -56,7 +56,6 @@ export function CaveatList({
           <CaveatDot enforcerName={c.enforcerName} />
           <div className="min-w-0">
             <p className="text-xs leading-snug text-forge-text">{c.humanReadable}</p>
-            <p className="text-[10px] text-forge-text-subtle">{c.enforcerName}</p>
           </div>
         </li>
       ))}

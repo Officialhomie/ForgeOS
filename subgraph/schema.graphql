@@ -1,0 +1,106 @@
+# ─── ENUMS ────────────────────────────────────────────────────────────────────
+
+enum DelegationStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum TreasuryEventType {
+  FUNDED
+  PAYMENT
+  DISTRIBUTION
+}
+
+# ─── CORE ENTITIES ────────────────────────────────────────────────────────────
+
+"""
+A delegation granted on OSKernel — root (hop=0), sub (hop=1), or re-delegation (hop≥2).
+"""
+type Delegation @entity {
+  id: ID!
+  hash: Bytes!
+  delegator: Bytes!
+  delegatee: Bytes!
+  hopCount: Int!
+  status: DelegationStatus!
+  createdAt: BigInt!
+}
+
+"""
+An agent registered on ForgeOSRegistry. totalRuns / successfulRuns are updated
+by the cron route; the subgraph tracks on-chain registration data only.
+"""
+type Agent @entity {
+  id: ID!
+  agentId: Bytes!
+  name: String!
+  endpoint: String!
+  active: Boolean!
+  totalRuns: Int!
+  successfulRuns: Int!
+  totalSpent: BigInt!
+  registeredAt: BigInt!
+}
+
+"""
+Singleton treasury summary (id = "treasury").
+"""
+type TreasuryState @entity {
+  id: ID!
+  balance: BigInt!
+  totalFunded: BigInt!
+  totalSpent: BigInt!
+  lastUpdatedAt: BigInt!
+}
+
+"""
+An on-chain treasury event — fund deposit, agent payment, or revenue distribution.
+userShare / refillShare / platformShare are non-null only for DISTRIBUTION events.
+"""
+type TreasuryEvent @entity {
+  id: ID!
+  eventType: TreasuryEventType!
+  amount: BigInt!
+  actor: Bytes!
+  agentId: Bytes
+  txHash: Bytes!
+  timestamp: BigInt!
+  userShare: BigInt
+  refillShare: BigInt
+  platformShare: BigInt
+}
+
+"""
+Unified activity feed — one entry per on-chain event, across all contracts.
+"""
+type ActivityEvent @entity {
+  id: ID!
+  eventType: String!
+  actor: Bytes!
+  agentId: Bytes
+  delegationHash: Bytes
+  description: String!
+  amount: BigInt
+  txHash: Bytes!
+  timestamp: BigInt!
+}
+
+# ─── INTERNAL HELPERS (not queried by the app) ────────────────────────────────
+
+"""
+Tracks every address that has ever received a delegation, with their hop depth.
+Used to infer hop count for subsequent delegations without call handlers.
+"""
+type KnownDelegatee @entity {
+  id: ID!
+  hopCount: Int!
+}
+
+"""
+Singleton tracking all currently active delegation hashes.
+Used by AllDelegationsRevoked to efficiently mass-revoke.
+"""
+type KernelState @entity {
+  id: ID!
+  activeDelegationHashes: [String!]!
+}

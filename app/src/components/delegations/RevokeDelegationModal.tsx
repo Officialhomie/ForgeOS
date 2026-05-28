@@ -35,10 +35,9 @@ export function RevokeDelegationModal({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-forge-border bg-forge-surface p-6 shadow-2xl focus:outline-none">
-          <Dialog.Title className="text-lg font-semibold">Revoke Delegation</Dialog.Title>
+          <Dialog.Title className="text-lg font-semibold">Remove permission?</Dialog.Title>
           <Dialog.Description className="mt-1.5 text-sm text-forge-text-muted">
-            This action is irreversible. All child sub-delegations rooted here will also be
-            invalidated on-chain.
+            This cannot be undone. Any agents that depend on this permission will also lose access.
           </Dialog.Description>
 
           <div className="mt-4 space-y-2 rounded-xl border border-forge-border bg-forge-elevated p-3 text-sm">
@@ -51,7 +50,7 @@ export function RevokeDelegationModal({
               <AddressDisplay address={delegation.delegate} />
             </div>
             <div className="flex items-start gap-2">
-              <span className="w-12 shrink-0 text-xs text-forge-text-subtle">Hash</span>
+              <span className="w-12 shrink-0 text-xs text-forge-text-subtle">ID</span>
               <span className="break-all font-mono text-xs text-forge-text">
                 {delegation.hash.slice(0, 26)}…
               </span>
@@ -65,7 +64,7 @@ export function RevokeDelegationModal({
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleRevoke} disabled={loading}>
-              {loading ? 'Revoking…' : 'Revoke Delegation'}
+              {loading ? 'Removing…' : 'Remove permission'}
             </Button>
           </div>
         </Dialog.Content>

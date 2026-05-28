@@ -9,44 +9,21 @@
  */
 
 import { NextResponse } from 'next/server'
-import { isDemoMode } from '@/lib/demo'
-import { getVeniceClient, VenicePaymentRequired } from '@/lib/venice/client'
+import { assertTreasuryForInference } from '@/lib/treasury/guard'
+import {
+  formatFundingSnapshot,
+  getAgentFundingSnapshot,
+  getVeniceClient,
+  hasAgentWallet,
+  isBalanceCheckIntent,
+  VeniceInsufficientBalanceError,
+  VenicePaymentRequired,
+  VeniceWalletError,
+  walletEnvDiagnostics,
+} from '@/lib/venice/client'
 import { activityEmitter } from '@/lib/events/activity-emitter'
+import { createFlowTimer } from '@/lib/telemetry/flow-timer'
 import type { ActionPlan, VeniceSystemContext, ActivityEvent } from '@/types'
-
-// ─── MOCK PLAN (demo mode) ────────────────────────────────────────────────────
-
-function mockActionPlan(intent: string): ActionPlan {
-  return {
-    id: `plan_demo_${Date.now()}`,
-    intent,
-    summary: `Demo plan: ${intent.slice(0, 60)}`,
-    actions: [
-      {
-        id: 'action_demo_1',
-        type: 'erc20_swap',
-        agentId: 'defi-rebalancer',
-        delegationChain: [
-          '0xROOT0000000000000000000000000000000000000000000000000000000000001',
-          '0xDEFI0000000000000000000000000000000000000000000000000000000000001',
-        ],
-        target: '0xUniswap0000000000000000000000000000000000',
-        calldata: '0x',
-        value: 50_000000n,
-        humanDescription: 'Swap 50 USDC → ETH on Uniswap V3',
-        estimatedOutput: '~0.021 ETH',
-        withinDelegationScope: true,
-        dependsOn: [],
-      },
-    ],
-    estimatedCost: 40000n,
-    estimatedGas: 0n,
-    withinPolicy: true,
-    policyViolations: [],
-    generatedAt: Math.floor(Date.now() / 1000),
-    veniceModel: 'llama-3.3-70b',
-  }
-}
 
 // ─── REQUEST BODY ─────────────────────────────────────────────────────────────
 
@@ -71,55 +48,74 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'intent is required', code: 'UNKNOWN' }, { status: 400 })
   }
 
-  // ── Demo mode ──────────────────────────────────────────────────────────────
-  if (isDemoMode()) {
-    const plan = mockActionPlan(intent)
-
-    // Emit demo activity event so the feed updates
-    const activity: ActivityEvent = {
-      id: `cmd_${Date.now()}`,
-      type: 'command_executed',
-      agentId: null,
-      title: 'Command received',
-      description: intent.slice(0, 80),
-      amount: null,
-      txHash: null,
-      delegationHash: null,
-      timestamp: Math.floor(Date.now() / 1000),
-      status: 'confirmed',
-    }
-    activityEmitter.emitActivity(activity)
-
-    return NextResponse.json({
-      success: true,
-      actionPlan: serialisePlan(plan),
-      veniceModel: 'llama-3.3-70b',
-      cost: '0.00',
-      streamUrl: null,
-    })
-  }
-
-  // ── Live mode ──────────────────────────────────────────────────────────────
-  if (!process.env.AGENT_WALLET_KEY) {
+  if (!hasAgentWallet()) {
+    const diag = walletEnvDiagnostics()
+    const detail =
+      diag.turnkeyVarsSet > 0 && diag.turnkeyVarsSet < 5
+        ? `Turnkey is partially configured (${diag.turnkeyVarsSet}/5 vars). Missing: ${diag.turnkeyVarsMissing.join(', ')}.`
+        : 'Neither AGENT_WALLET_KEY nor a complete set of TURNKEY_* vars is available to the server. Put secrets in app/.env.local and restart pnpm dev.'
     return NextResponse.json(
-      { success: false, error: 'AGENT_WALLET_KEY not configured', code: 'VENICE_ERROR' },
+      { success: false, error: detail, code: 'WALLET_UNCONFIGURED' },
       { status: 503 },
     )
   }
 
+  const treasuryCheck = await assertTreasuryForInference()
+  if (!treasuryCheck.ok) {
+    return NextResponse.json(
+      { success: false, error: treasuryCheck.message, code: 'TREASURY_LOW' },
+      { status: 402 },
+    )
+  }
+
+  if (isBalanceCheckIntent(intent)) {
+    try {
+      const snapshot = await getAgentFundingSnapshot()
+      const summary = formatFundingSnapshot(snapshot)
+      return NextResponse.json({
+        success: true,
+        balanceReport: snapshot,
+        summary,
+        actionPlan: serialisePlan({
+          id: `balance_${Date.now()}`,
+          intent,
+          summary,
+          actions: [],
+          estimatedCost: 0n,
+          estimatedGas: 0n,
+          withinPolicy: true,
+          policyViolations: [],
+          generatedAt: Math.floor(Date.now() / 1000),
+          veniceModel: 'base-mainnet-rpc',
+        }),
+        veniceModel: 'base-mainnet-rpc',
+        cost: '0',
+        streamUrl: null,
+        timing: null,
+      })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Balance check failed'
+      return NextResponse.json({ success: false, error: msg, code: 'VENICE_ERROR' }, { status: 500 })
+    }
+  }
+
+  const timer = createFlowTimer('command')
+
   try {
-    const venice = getVeniceClient()
+    timer.checkpoint('venice_init_start')
+    const venice = await getVeniceClient()
+    timer.checkpoint('venice_init_end')
 
     // ① Chat completion — intent parsing
+    timer.checkpoint('venice_start')
     const plan = await venice.parseIntent(intent, context)
+    timer.checkpoint('venice_end')
 
     // ② Embeddings — agent memory lookup (satisfies Venice multi-endpoint requirement)
     //    Run in background; don't block the response.
     void venice
       .embeddings({ input: intent })
       .then((embedding) => {
-        // In production: store embedding for semantic search over agent history.
-        // For now, just log the dimension to prove the call fired.
         void embedding.length // silence unused var lint
       })
       .catch(() => {
@@ -140,21 +136,47 @@ export async function POST(request: Request) {
     }
     activityEmitter.emitActivity(activity)
 
+    const timing = timer.end()
     return NextResponse.json({
       success: true,
       actionPlan: serialisePlan(plan),
       veniceModel: plan.veniceModel,
       cost: (Number(plan.estimatedCost) / 1_000_000).toFixed(4),
       streamUrl: null,
+      timing,
     })
   } catch (e) {
+    if (e instanceof VeniceInsufficientBalanceError) {
+      return NextResponse.json(
+        { success: false, error: e.message, code: 'VENICE_BALANCE_LOW' },
+        { status: 402 },
+      )
+    }
     if (e instanceof VenicePaymentRequired) {
       return NextResponse.json(
         { success: false, error: 'Treasury balance insufficient for Venice inference', code: 'INSUFFICIENT_TREASURY' },
         { status: 402 },
       )
     }
+    if (e instanceof VeniceWalletError) {
+      return NextResponse.json(
+        { success: false, error: e.message, code: e.code },
+        { status: e.code === 'WALLET_UNCONFIGURED' ? 503 : 500 },
+      )
+    }
     const msg = e instanceof Error ? e.message : 'Venice error'
+    if (msg.includes('exceeds balance') || msg.includes('insufficient funds')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'The server agent wallet does not have enough USDC on Base to fund Venice AI. ' +
+            'Send USDC on Base mainnet (chain 8453) to the agent wallet in your env, then retry.',
+          code: 'VENICE_BALANCE_LOW',
+        },
+        { status: 402 },
+      )
+    }
     return NextResponse.json(
       { success: false, error: msg, code: 'VENICE_ERROR' },
       { status: 500 },

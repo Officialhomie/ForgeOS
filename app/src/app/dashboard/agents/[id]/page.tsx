@@ -118,7 +118,7 @@ export default function AgentDetailPage({
         </div>
         {agent.delegation && (
           <div className="text-right text-xs text-forge-text-subtle">
-            <p>Delegation active</p>
+            <p>Permission active</p>
             <AddressDisplay address={agent.delegation.delegate} />
           </div>
         )}
@@ -129,7 +129,7 @@ export default function AgentDetailPage({
         <Tabs.List className="flex border-b border-forge-border">
           <TabTrigger value="overview">Overview</TabTrigger>
           <TabTrigger value="runs">Run History</TabTrigger>
-          <TabTrigger value="delegation">Delegation</TabTrigger>
+          <TabTrigger value="delegation">Permissions</TabTrigger>
           <TabTrigger value="settings">Settings</TabTrigger>
         </Tabs.List>
 
@@ -142,7 +142,7 @@ export default function AgentDetailPage({
               value={successRate}
               sub={`${agent.failureCount} failed`}
             />
-            <MetricCard label="Gas saved" value={formatUsdc(agent.gasSaved)} />
+            <MetricCard label="Fees saved" value={formatUsdc(agent.gasSaved)} />
             <MetricCard
               label="Lifetime earnings"
               value={formatUsdc(agent.earningsLifetime)}
@@ -172,7 +172,7 @@ export default function AgentDetailPage({
           {/* P8.6 — A2A chain for agents with re-delegations */}
           {hasA2A && (
             <div className="space-y-2">
-              <p className="text-sm font-medium">A2A delegation chain</p>
+              <p className="text-sm font-medium">How this agent shares permissions</p>
               <A2AChainVisualizer state={a2aState} defiHash={subHash} redelHash={redelHash} />
             </div>
           )}
@@ -195,7 +195,7 @@ export default function AgentDetailPage({
         <Tabs.Content value="delegation" className="mt-6 space-y-6 focus:outline-none">
           {agent.delegation ? (
             <div className="space-y-3">
-              <p className="text-sm font-medium">Active delegation</p>
+              <p className="text-sm font-medium">Active permission</p>
               <div className="rounded-xl border border-forge-border bg-forge-surface p-4">
                 <div className="mb-3 flex items-center gap-2 text-xs text-forge-text-subtle">
                   <span>From</span>
@@ -210,13 +210,13 @@ export default function AgentDetailPage({
               </div>
             </div>
           ) : (
-            <p className="text-sm text-forge-text-muted">No delegation assigned.</p>
+            <p className="text-sm text-forge-text-muted">No permission assigned to this agent yet.</p>
           )}
 
           {agent.redelegations.length > 0 && (
             <div className="space-y-3">
               <p className="text-sm font-medium">
-                Redelegations issued{' '}
+                Shared permissions{' '}
                 <span className="text-forge-text-subtle">({agent.redelegations.length})</span>
               </p>
               {agent.redelegations.map((d) => (
@@ -226,7 +226,7 @@ export default function AgentDetailPage({
               {/* P8.6 — Live A2A chain status */}
               <div className="pt-2">
                 <p className="mb-2 text-xs font-medium text-forge-text-muted">
-                  Live A2A chain status
+                  Permission flow status
                 </p>
                 <A2AChainVisualizer state={a2aState} defiHash={subHash} redelHash={redelHash} />
               </div>
@@ -240,7 +240,7 @@ export default function AgentDetailPage({
             <h3 className="text-sm font-medium">Configuration</h3>
             <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <div>
-                <p className="text-xs text-forge-text-subtle">Venice model</p>
+                <p className="text-xs text-forge-text-subtle">AI model</p>
                 <p className="font-mono text-forge-text">{agent.config.veniceModel}</p>
               </div>
               <div>
@@ -280,7 +280,7 @@ export default function AgentDetailPage({
                 {agent.status === 'paused' ? 'Agent paused' : 'Pause agent'}
               </p>
               <p className="text-xs text-forge-text-muted">
-                Pausing stops scheduled runs without revoking the delegation.
+                Pausing stops scheduled runs. Your permission stays in place until you remove it.
               </p>
             </div>
             <Button variant={agent.status === 'paused' ? 'default' : 'outline'} size="sm">

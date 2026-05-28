@@ -2,13 +2,11 @@
 
 import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { isDemoMode } from '@/lib/demo'
 import { GRAPH_POLL_MS, isGraphEnabled } from '@/lib/graph/config'
 import { queryGraph } from '@/lib/graph/client'
 import { mapGraphDelegation } from '@/lib/graph/mappers'
 import { GET_DELEGATIONS } from '@/lib/graph/queries'
 import type { GraphDelegationNode } from '@/lib/graph/types'
-import { MOCK_DELEGATIONS } from '@/lib/mock-data'
 import { buildDelegationTree } from '@/lib/utils'
 import { useDelegationsStore } from '@/stores/delegations.store'
 import type { Delegation } from '@/types'
@@ -17,19 +15,29 @@ interface DelegationsResponse {
   delegations: GraphDelegationNode[]
 }
 
+function mergeDelegations(local: Delegation[], indexed: Delegation[]): Delegation[] {
+  const byHash = new Map<string, Delegation>()
+  for (const d of indexed) {
+    byHash.set(d.hash.toLowerCase(), d)
+  }
+  for (const d of local) {
+    byHash.set(d.hash.toLowerCase(), d)
+  }
+  return Array.from(byHash.values())
+}
+
 export function useDelegations(): {
   delegations: Delegation[]
   tree: Delegation | null
   loading: boolean
   error: string | null
 } {
-  const delegations = useDelegationsStore((s) => s.delegations)
+  const storeDelegations = useDelegationsStore((s) => s.delegations)
   const loading = useDelegationsStore((s) => s.loading)
   const setDelegations = useDelegationsStore((s) => s.setDelegations)
   const setLoading = useDelegationsStore((s) => s.setLoading)
 
-  const demo = isDemoMode()
-  const graphOn = isGraphEnabled() && !demo
+  const graphOn = isGraphEnabled()
 
   const query = useQuery({
     queryKey: ['delegations', 'graph'],
@@ -44,28 +52,31 @@ export function useDelegations(): {
   })
 
   useEffect(() => {
-    if (demo) {
-      setDelegations(Object.values(MOCK_DELEGATIONS))
-      setLoading(false)
-      return
-    }
     if (!graphOn) {
-      setDelegations(Object.values(MOCK_DELEGATIONS))
       setLoading(false)
       return
     }
     setLoading(query.isLoading)
     if (query.data) {
-      setDelegations(query.data)
+      const local = useDelegationsStore.getState().delegations
+      setDelegations(mergeDelegations(local, query.data))
     }
-  }, [demo, graphOn, query.isLoading, query.data, setDelegations, setLoading])
+  }, [graphOn, query.isLoading, query.data, setDelegations, setLoading])
+
+  const delegations = useMemo(
+    () =>
+      graphOn && query.data
+        ? mergeDelegations(storeDelegations, query.data)
+        : storeDelegations,
+    [graphOn, query.data, storeDelegations],
+  )
 
   const tree = useMemo(() => buildDelegationTree(delegations), [delegations])
 
   return {
     delegations,
     tree,
-    loading: demo ? false : loading,
+    loading,
     error: query.isError
       ? query.error instanceof Error
         ? query.error.message

@@ -59,8 +59,8 @@ export function KillSwitchModal({ onClose }: KillSwitchModalProps) {
             <div>
               <h2 className="text-lg font-bold text-forge-text">All agents stopped</h2>
               <p className="mt-1 text-sm text-forge-text-muted">
-                All delegations have been atomically revoked. No further agent actions can
-                execute until you re-activate via the Activation Wizard.
+                All agent permissions have been removed. Nothing can run until you set up
+                again on the Activate page.
               </p>
             </div>
             <button
@@ -87,9 +87,9 @@ export function KillSwitchModal({ onClose }: KillSwitchModalProps) {
                 </svg>
               </div>
               <div>
-                <h2 className="text-base font-bold text-forge-text">Emergency Kill Switch</h2>
+                <h2 className="text-base font-bold text-forge-text">Stop all agents?</h2>
                 <p className="mt-0.5 text-sm text-forge-text-muted">
-                  This will atomically revoke all agent permissions in a single transaction.
+                  This removes every permission at once. Scheduled runs and automatic payments stop immediately.
                 </p>
               </div>
             </div>
@@ -98,10 +98,10 @@ export function KillSwitchModal({ onClose }: KillSwitchModalProps) {
             <div className="rounded-lg border border-forge-danger/20 bg-forge-danger/5 px-4 py-3">
               <p className="text-sm text-forge-text">
                 <span className="font-semibold text-forge-danger">{activeDelegationCount}</span>{' '}
-                active delegation{activeDelegationCount !== 1 ? 's' : ''} will be revoked
+                active permission{activeDelegationCount !== 1 ? 's' : ''} will be removed
               </p>
               <p className="mt-0.5 text-xs text-forge-text-subtle">
-                OSKernel.revokeAll() via 1Shot relay · AllDelegationsRevoked event emitted
+                One on-chain transaction confirms the change for your wallet.
               </p>
             </div>
 
@@ -117,7 +117,7 @@ export function KillSwitchModal({ onClose }: KillSwitchModalProps) {
               </li>
               <li className="flex gap-2">
                 <span className="text-forge-danger">·</span>
-                Re-activation requires going through the Activation Wizard again
+                You will need to run setup again on the Activate page
               </li>
             </ul>
 
@@ -150,7 +150,7 @@ export function KillSwitchModal({ onClose }: KillSwitchModalProps) {
                     Revoking…
                   </span>
                 ) : (
-                  'Revoke All Delegations'
+                  'Stop all agents'
                 )}
               </button>
             </div>

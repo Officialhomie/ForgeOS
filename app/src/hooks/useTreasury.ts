@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ONESHOT } from '@/lib/constants'
-import { isDemoMode } from '@/lib/demo'
 import { CONTRACTS } from '@/lib/contracts'
 import { GRAPH_POLL_MS, isGraphEnabled } from '@/lib/graph/config'
 import { queryGraph } from '@/lib/graph/client'
@@ -15,7 +14,6 @@ import {
 } from '@/lib/graph/mappers'
 import { GET_DAILY_PAYMENTS, GET_TREASURY_SUMMARY } from '@/lib/graph/queries'
 import type { GraphTreasuryEvent, GraphTreasuryState } from '@/lib/graph/types'
-import { MOCK_TREASURY } from '@/lib/mock-data'
 import { readTreasuryBalance } from '@/lib/treasury/onchain'
 import { useTreasuryStore } from '@/stores/treasury.store'
 import type { TreasuryState } from '@/types'
@@ -36,6 +34,7 @@ export function useTreasury(): {
   recentPayments: TreasuryPaymentRow[]
   dailySpend: { date: string; total: bigint }[]
   refetch: () => void
+  topUp: (amountUsdc: string) => Promise<{ taskId: string }>
 } {
   const treasury = useTreasuryStore((s) => s.treasury)
   const loading = useTreasuryStore((s) => s.loading)
@@ -48,25 +47,25 @@ export function useTreasury(): {
   )
   const [error, setError] = useState<string | null>(null)
 
-  const demo = isDemoMode()
-  const graphOn = isGraphEnabled() && !demo
+  const graphOn = isGraphEnabled()
 
   const fetchLive = useCallback(async () => {
-    const [summary, liveBalance] = await Promise.all([
-      queryGraph<TreasurySummaryResponse>(GET_TREASURY_SUMMARY, {
-        paymentsFirst: 50,
-      }),
-      readTreasuryBalance(),
+    // Always read the live on-chain balance — works even while the subgraph syncs
+    const liveBalance = await readTreasuryBalance()
+
+    // Subgraph queries may fail while the indexer is initializing — treat as non-fatal
+    const since = String(Math.floor(Date.now() / 1000) - 30 * 86400)
+    const [summaryResult, dailyResult] = await Promise.allSettled([
+      queryGraph<TreasurySummaryResponse>(GET_TREASURY_SUMMARY, { paymentsFirst: 50 }),
+      queryGraph<DailyPaymentsResponse>(GET_DAILY_PAYMENTS, { since }),
     ])
 
-    const since = String(Math.floor(Date.now() / 1000) - 30 * 86400)
-    const daily = await queryGraph<DailyPaymentsResponse>(GET_DAILY_PAYMENTS, {
-      since,
-    })
+    const summary = summaryResult.status === 'fulfilled' ? summaryResult.value : null
+    const daily = dailyResult.status === 'fulfilled' ? dailyResult.value : null
 
     const mapped = mapGraphTreasury(
-      summary.treasuryState,
-      summary.treasuryEvents,
+      summary?.treasuryState ?? null,
+      summary?.treasuryEvents ?? [],
       {
         chainId: ONESHOT.CHAIN_ID,
         treasuryAddress: CONTRACTS.agentTreasury,
@@ -76,9 +75,10 @@ export function useTreasury(): {
     )
 
     setTreasury(mapped)
-    setRecentPayments(mapTreasuryPayments(summary.treasuryEvents))
-    setDailySpend(aggregateDailyPayments(daily.treasuryEvents))
+    setRecentPayments(mapTreasuryPayments(summary?.treasuryEvents ?? []))
+    setDailySpend(aggregateDailyPayments(daily?.treasuryEvents ?? []))
     setError(null)
+    return mapped   // React Query v5 requires a non-undefined return value
   }, [setTreasury])
 
   const query = useQuery({
@@ -90,63 +90,44 @@ export function useTreasury(): {
   })
 
   useEffect(() => {
-    if (demo) {
-      setTreasury(MOCK_TREASURY)
-      setRecentPayments([])
-      setDailySpend([])
-      setLoading(false)
-      setError(null)
-      return
-    }
-
     if (!graphOn) {
-      setTreasury(MOCK_TREASURY)
       setLoading(false)
-      setError(null)
       return
     }
-
     setLoading(query.isLoading)
+    // fetchLive handles subgraph errors internally (allSettled) — only surface
+    // errors that prevent even the live balance from loading.
     if (query.isError) {
-      setError(
-        query.error instanceof Error
-          ? query.error.message
-          : 'Failed to load treasury',
-      )
-      setTreasury(MOCK_TREASURY)
+      const msg = query.error instanceof Error ? query.error.message : ''
+      const isSubgraphSyncing = msg.includes('not started syncing') || msg.includes('Subgraph')
+      if (!isSubgraphSyncing) {
+        setError(msg || 'Failed to load treasury')
+      }
     }
-  }, [
-    demo,
-    graphOn,
-    query.isLoading,
-    query.isError,
-    query.error,
-    setTreasury,
-    setLoading,
-  ])
+  }, [graphOn, query.isLoading, query.isError, query.error, setLoading])
+
+  const topUp = useCallback(async (amountUsdc: string): Promise<{ taskId: string }> => {
+    const res = await fetch('/api/relay/fund', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chainId: ONESHOT.CHAIN_ID,
+        amountUsdc,
+        treasuryAddress: CONTRACTS.agentTreasury,
+      }),
+    })
+    const data = (await res.json()) as { success?: boolean; taskId?: string; error?: string }
+    if (!res.ok || !data.taskId) throw new Error(data.error ?? 'Fund failed')
+    return { taskId: data.taskId }
+  }, [])
 
   return {
     treasury,
-    loading: demo ? false : loading || query.isLoading,
+    loading: loading || query.isLoading,
     error,
-    recentPayments: demo ? [] : recentPayments,
-    dailySpend: demo
-      ? buildDemoDailySpend()
-      : dailySpend,
+    recentPayments,
+    dailySpend,
     refetch: () => void query.refetch(),
+    topUp,
   }
-}
-
-function buildDemoDailySpend(): { date: string; total: bigint }[] {
-  const rows: { date: string; total: bigint }[] = []
-  const now = Date.now()
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(now - i * 86400000)
-    const key = d.toISOString().slice(0, 10)
-    rows.push({
-      date: key,
-      total: i % 7 === 0 ? 12_000_000n : i % 3 === 0 ? 5_000_000n : 0n,
-    })
-  }
-  return rows
 }

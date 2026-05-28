@@ -13,7 +13,7 @@ export function RecentPaymentsTable({
   if (payments.length === 0) {
     return (
       <p className="py-8 text-center text-sm text-forge-text-muted">
-        No payments indexed yet
+        No payments recorded yet
       </p>
     )
   }

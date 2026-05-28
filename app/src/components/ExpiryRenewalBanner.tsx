@@ -23,7 +23,7 @@ export function ExpiryRenewalBanner() {
 
   return (
     <div className="mb-4 rounded-lg border border-orange-500/30 bg-orange-500/10 px-4 py-3 text-sm">
-      Root delegation expires in {daysLeft} days.{' '}
+      Your main permission grant expires in {daysLeft} days.{' '}
       <Link href="/activate" className="font-medium text-orange-300 underline">
         Renew permissions
       </Link>

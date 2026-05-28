@@ -77,7 +77,7 @@ export async function send7710Transaction(args: {
   const token = caps.acceptedTokens?.[0]
   if (!token) {
     throw new Error(
-      '1Shot relayer returned no accepted payment tokens for this chain. Fund via wallet on Sepolia instead.',
+      'Gasless relay is not available on this network right now.',
     )
   }
 

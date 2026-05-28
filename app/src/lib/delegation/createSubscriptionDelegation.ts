@@ -24,6 +24,7 @@ import type { Address as ViemAddress } from 'viem'
 import { CONTRACTS } from '@/lib/contracts'
 import { ACTIVATION_CHAIN_ID } from '@/types/activation'
 import type { Address, Delegation, Hash } from '@/types'
+import { normalizeBytes32 } from '@/lib/delegation/normalize-for-encoding'
 
 // ─── DEFAULTS ─────────────────────────────────────────────────────────────────
 
@@ -142,7 +143,7 @@ export function subscriptionDelegationToForge(
         humanReadable: `Max ${maxCycles} payments`,
       },
     ],
-    salt: kitDel.salt,
+    salt: normalizeBytes32(kitDel.salt),
     signature,
     hop: 'sub',
     status: 'active',

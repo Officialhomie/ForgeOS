@@ -15,6 +15,12 @@ const HOP_STYLES: Record<string, string> = {
   redelegation: 'border-amber-400/40 bg-amber-400/10 text-amber-400',
 }
 
+const HOP_LABELS: Record<string, string> = {
+  root: 'main',
+  sub: 'agent',
+  redelegation: 'shared',
+}
+
 // ─── COMPONENT ────────────────────────────────────────────────────────────────
 
 export function DelegationCard({ delegation }: { delegation: Delegation }) {
@@ -32,7 +38,7 @@ export function DelegationCard({ delegation }: { delegation: Delegation }) {
               HOP_STYLES[delegation.hop] ?? HOP_STYLES.sub,
             )}
           >
-            {delegation.hop}
+            {HOP_LABELS[delegation.hop] ?? delegation.hop}
           </span>
 
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
@@ -61,8 +67,8 @@ export function DelegationCard({ delegation }: { delegation: Delegation }) {
               className="text-[11px] text-forge-text-subtle hover:text-forge-text"
             >
               {expanded
-                ? 'Hide caveats'
-                : `${delegation.caveats.length} caveat${delegation.caveats.length !== 1 ? 's' : ''}`}
+                ? 'Hide rules'
+                : `${delegation.caveats.length} rule${delegation.caveats.length !== 1 ? 's' : ''}`}
             </button>
 
             {delegation.status === 'active' && delegation.hop !== 'root' && (
@@ -71,7 +77,7 @@ export function DelegationCard({ delegation }: { delegation: Delegation }) {
                 onClick={() => setRevokeOpen(true)}
                 className="rounded border border-forge-danger/40 px-2 py-0.5 text-[11px] text-forge-danger transition-colors hover:bg-forge-danger/10"
               >
-                Revoke
+                Remove
               </button>
             )}
           </div>
@@ -82,7 +88,7 @@ export function DelegationCard({ delegation }: { delegation: Delegation }) {
           <div className="border-t border-forge-border px-4 pb-4 pt-3">
             <CaveatList caveats={delegation.caveats} />
             <p className="mt-2 font-mono text-[10px] text-forge-text-subtle">
-              Hash: {delegation.hash.slice(0, 26)}…
+              ID: {delegation.hash.slice(0, 26)}…
             </p>
           </div>
         )}

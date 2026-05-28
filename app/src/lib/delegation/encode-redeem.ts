@@ -15,6 +15,7 @@
 
 import { encodeFunctionData, encodeAbiParameters, toFunctionSelector, type Hex, type Address } from 'viem'
 import type { Delegation } from '@/types'
+import { delegationTupleForEncoding } from '@/lib/delegation/normalize-for-encoding'
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -66,9 +67,6 @@ export function getRedeemDelegationsSelector(): Hex {
  * Maps the ForgeOS Delegation type to the on-chain struct layout.
  */
 export function encodeDelegationStruct(d: Delegation): Hex {
-  const ROOT_AUTHORITY =
-    '0x0000000000000000000000000000000000000000000000000000000000000000'
-
   return encodeAbiParameters(
     [
       {
@@ -91,20 +89,7 @@ export function encodeDelegationStruct(d: Delegation): Hex {
         ],
       },
     ],
-    [
-      {
-        delegate: d.delegate,
-        delegator: d.delegator,
-        authority: d.authority === 'ROOT' ? ROOT_AUTHORITY as Hex : d.authority,
-        caveats: d.caveats.map((c) => ({
-          enforcer: c.enforcer,
-          terms: c.terms,
-          args: '0x' as Hex,
-        })),
-        salt: d.salt,
-        signature: d.signature,
-      },
-    ],
+    [delegationTupleForEncoding(d)],
   )
 }
 

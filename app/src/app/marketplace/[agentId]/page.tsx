@@ -137,7 +137,7 @@ export default function AgentDetailPage({
           )}
           {agent.blockNumber && (
             <div>
-              <p className="text-forge-text-subtle">Block</p>
+              <p className="text-forge-text-subtle">Network record</p>
               <p className="mt-0.5 text-forge-text">#{agent.blockNumber}</p>
             </div>
           )}
@@ -184,7 +184,7 @@ export default function AgentDetailPage({
           <span className="inline-flex items-center gap-1.5 text-base font-semibold text-forge-text">
             Add to your account
             <Tooltip
-              content="When you tap the button below, your wallet will open and ask you to approve this agent. You are not signing a transaction — you are granting a permission. You can revoke it at any time from your dashboard."
+              content="When you tap the button below, your wallet will open and ask you to approve this agent. You are not sending money — you are granting a permission. You can remove it anytime from your dashboard."
               side="top"
             />
           </span>

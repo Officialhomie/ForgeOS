@@ -55,7 +55,7 @@ export function TemplateCard({
         <span className="flex items-center gap-1">
           {template.defaultCaveats.length} built-in safety rule{template.defaultCaveats.length !== 1 ? 's' : ''}
           <Tooltip
-            content="Automatic guardrails applied to every action this agent takes. These cannot be overridden or bypassed — they are enforced at the smart contract level."
+            content="Automatic guardrails on every action this agent takes. These limits cannot be turned off or bypassed."
             side="bottom"
           />
         </span>

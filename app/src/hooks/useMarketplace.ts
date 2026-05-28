@@ -81,7 +81,7 @@ export function useMarketplace(): UseMarketplaceReturn {
   const installAgent = useCallback(
     async (agentId: `0x${string}`): Promise<{ success: boolean; error?: string }> => {
       if (!address) return { success: false, error: 'Wallet not connected' }
-      if (!rootDelegation?.hash) return { success: false, error: 'OS not activated — complete activation first' }
+      if (!rootDelegation?.hash) return { success: false, error: 'Finish setup on the Activate page before installing agents' }
 
       try {
         // 1. Get install params from server

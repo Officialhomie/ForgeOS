@@ -12,6 +12,7 @@ import type { Address as ViemAddress } from 'viem'
 import { CONTRACTS } from '@/lib/contracts'
 import { ACTIVATION_CHAIN_ID } from '@/types/activation'
 import type { Address, Delegation, Hash, Policy } from '@/types'
+import { normalizeBytes32 } from '@/lib/delegation/normalize-for-encoding'
 
 function getEnvironment() {
   return Promise.resolve(
@@ -74,7 +75,7 @@ export function kitDelegationToForge(
       decodedTerms: {},
       humanReadable: 'On-chain caveat',
     })),
-    salt: kit.salt,
+    salt: normalizeBytes32(kit.salt),
     signature,
     hop: 'root',
     status: 'active',

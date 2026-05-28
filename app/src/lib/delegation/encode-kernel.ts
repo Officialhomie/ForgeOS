@@ -1,6 +1,7 @@
 import { encodeFunctionData, type Hex } from 'viem'
 import type { Delegation, Hash } from '@/types'
 import { encodeDelegationStruct } from '@/lib/delegation/encode-redeem'
+import { delegationTupleForEncoding } from '@/lib/delegation/normalize-for-encoding'
 
 const OS_KERNEL_REDELEGATE_ABI = [
   {
@@ -34,22 +35,8 @@ const OS_KERNEL_REDELEGATE_ABI = [
   },
 ] as const
 
-const ROOT_AUTHORITY =
-  '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex
-
 function delegationToKernelArgs(d: Delegation) {
-  return {
-    delegate: d.delegate,
-    delegator: d.delegator,
-    authority: d.authority === 'ROOT' ? ROOT_AUTHORITY : d.authority,
-    caveats: d.caveats.map((c) => ({
-      enforcer: c.enforcer,
-      terms: c.terms,
-      args: '0x' as Hex,
-    })),
-    salt: d.salt,
-    signature: d.signature,
-  }
+  return delegationTupleForEncoding(d)
 }
 
 export function encodeKernelRedelegateCalldata(

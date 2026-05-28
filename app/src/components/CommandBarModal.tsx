@@ -68,9 +68,6 @@ export function CommandBarModal() {
         setCommand({ status: 'planning', actionPlan: plan, timing: data.timing ?? null })
         setPendingPlan(plan)
       } else {
-        // #region agent log
-        fetch('http://127.0.0.1:7382/ingest/ac790453-c85d-4969-8a8c-a39f7089e0c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'076bd8'},body:JSON.stringify({sessionId:'076bd8',location:'CommandBarModal.tsx:handleSubmit',message:'command API error',data:{code:data.code,error:(data.error??'').slice(0,300),status:res.status},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
         setCommand({ status: 'failed', error: data.error, errorCode: data.code })
       }
     } catch (e) {

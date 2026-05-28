@@ -140,8 +140,8 @@ export function useAgentBuilder(): UseAgentBuilderReturn {
   }, [selectedTemplate, prompt])
 
   const approveAgent = useCallback(async () => {
-    if (!selectedTemplate || !rootDelegation) {
-      setError('Activate ForgeOS before approving agent permissions')
+    if (!selectedTemplate) {
+      setError('Select an agent template first')
       return
     }
     setStep('approving')
@@ -171,12 +171,12 @@ export function useAgentBuilder(): UseAgentBuilderReturn {
       setError(e instanceof Error ? e.message : 'Approval failed')
       setStep('configuring')
     }
-  }, [selectedTemplate, rootDelegation, spendCap])
+  }, [selectedTemplate, spendCap])
 
   const deployAgent = useCallback(async () => {
     if (!selectedTemplate) return
     if (!approvedDelegationHash && !rootDelegation) {
-      setError('Approve permissions before publishing')
+      setError('Approve agent permissions in your wallet before publishing')
       return
     }
 

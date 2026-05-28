@@ -35,7 +35,7 @@ export function Sidebar() {
     <aside className="flex w-60 shrink-0 flex-col border-r border-forge-border bg-forge-surface px-3 py-4">
       <div className="mb-6 px-3">
         <span className="text-lg font-bold text-forge-orange">ForgeOS</span>
-        <p className="text-xs text-forge-text-subtle">Agent kernel</p>
+        <p className="text-xs text-forge-text-subtle">Your agent control center</p>
       </div>
       <nav className="flex flex-1 flex-col gap-1">
         {NAV_ITEMS.map((item) => {
@@ -61,7 +61,7 @@ export function Sidebar() {
         })}
       </nav>
       <div className="mt-auto rounded-lg border border-forge-border-subtle bg-forge-bg px-3 py-3">
-        <p className="text-xs text-forge-text-subtle">OS Status</p>
+        <p className="text-xs text-forge-text-subtle">Account status</p>
         <p className="mt-1 text-sm font-medium capitalize text-forge-success">
           {osStatus}
         </p>

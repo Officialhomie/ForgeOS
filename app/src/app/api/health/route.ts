@@ -14,6 +14,7 @@
 import { NextResponse } from 'next/server'
 import { VENICE, ONESHOT } from '@/lib/constants'
 import { hasAgentWallet } from '@/lib/venice/client'
+import { forgeChain } from '@/lib/wagmi/chains'
 
 export type ServiceStatus = 'ok' | 'degraded' | 'error' | 'unconfigured'
 
@@ -39,6 +40,11 @@ export interface HealthResponse {
 
 // ─── PROBES ──────────────────────────────────────────────────────────────────
 
+function isTimeoutError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e)
+  return /timeout|aborted|timed out/i.test(msg)
+}
+
 async function probeVenice(): Promise<ServiceHealth> {
   const start = Date.now()
   try {
@@ -55,7 +61,7 @@ async function probeVenice(): Promise<ServiceHealth> {
     return { status: 'degraded', latencyMs, detail: `HTTP ${res.status}` }
   } catch (e) {
     return {
-      status: 'error',
+      status: isTimeoutError(e) ? 'degraded' : 'error',
       latencyMs: Date.now() - start,
       detail: e instanceof Error ? e.message : 'Unreachable',
     }
@@ -85,7 +91,7 @@ async function probeOneshot(): Promise<ServiceHealth> {
     return { status: 'degraded', latencyMs, detail: `HTTP ${res.status}` }
   } catch (e) {
     return {
-      status: 'error',
+      status: isTimeoutError(e) ? 'degraded' : 'error',
       latencyMs: Date.now() - start,
       detail: e instanceof Error ? e.message : 'Unreachable',
     }
@@ -93,9 +99,7 @@ async function probeOneshot(): Promise<ServiceHealth> {
 }
 
 async function probeChain(): Promise<ServiceHealth> {
-  const rpcUrl =
-    process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL ??
-    'https://rpc.sepolia.org'
+  const rpcUrl = forgeChain.rpcUrls.default.http[0]
 
   const start = Date.now()
   try {
@@ -103,7 +107,7 @@ async function probeChain(): Promise<ServiceHealth> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
     })
     const latencyMs = Date.now() - start
     if (!res.ok) return { status: 'degraded', latencyMs, detail: `HTTP ${res.status}` }
@@ -112,7 +116,7 @@ async function probeChain(): Promise<ServiceHealth> {
     return { status: 'ok', latencyMs, detail: `Block ${parseInt(json.result ?? '0', 16)}` }
   } catch (e) {
     return {
-      status: 'error',
+      status: isTimeoutError(e) ? 'degraded' : 'error',
       latencyMs: Date.now() - start,
       detail: e instanceof Error ? e.message : 'Unreachable',
     }
@@ -186,8 +190,8 @@ export async function GET() {
 
   const wallet = probeWallet()
 
-  // subgraph is non-critical — app degrades gracefully to local store
-  const critical = [venice, oneshot, chain, wallet]
+  // subgraph + wallet config are non-blocking for dashboard UX
+  const critical = [venice, oneshot, chain]
   const allOk = critical.every((s) => s.status === 'ok')
   const anyError = critical.some((s) => s.status === 'error')
 
@@ -198,5 +202,7 @@ export async function GET() {
     ready: allOk,
   }
 
-  return NextResponse.json(body, { status: anyError ? 503 : 200 })
+  // Always HTTP 200 — readiness is expressed in JSON (`ok`, `ready`, per-service status).
+  // Avoids noisy 503 logs when a probe is slow or temporarily unreachable.
+  return NextResponse.json(body, { status: 200 })
 }

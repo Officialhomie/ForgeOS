@@ -324,6 +324,8 @@ export interface CommandState {
   runId: string | null
   oneShotTaskId: string | null
   error: string | null
+  /** Machine-readable code from the last /api/command failure */
+  errorCode: string | null
   /** Per-step latency from the last /api/command call */
   timing: FlowTiming | null
 }

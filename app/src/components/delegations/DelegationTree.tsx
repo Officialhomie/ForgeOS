@@ -13,6 +13,12 @@ const HOP_STYLES: Record<string, string> = {
   redelegation: 'border-amber-400/40 bg-amber-400/10 text-amber-400',
 }
 
+const HOP_LABELS: Record<string, string> = {
+  root: 'main',
+  sub: 'agent',
+  redelegation: 'shared',
+}
+
 // ─── CHEVRON ──────────────────────────────────────────────────────────────────
 
 function Chevron({ open }: { open: boolean }) {
@@ -65,7 +71,7 @@ function DelegationNode({ delegation, depth }: { delegation: Delegation; depth: 
               HOP_STYLES[delegation.hop] ?? HOP_STYLES.sub,
             )}
           >
-            {delegation.hop}
+            {HOP_LABELS[delegation.hop] ?? delegation.hop}
           </span>
 
           <span className="font-mono text-xs text-forge-text">
@@ -98,7 +104,7 @@ function DelegationNode({ delegation, depth }: { delegation: Delegation; depth: 
         {expanded && (
           <div className="border-t border-forge-border px-4 pb-4 pt-3">
             <p className="mb-2 text-[10px] uppercase tracking-wider text-forge-text-subtle">
-              Caveats
+              Rules
             </p>
             <CaveatList caveats={delegation.caveats} />
             <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] text-forge-text-subtle">

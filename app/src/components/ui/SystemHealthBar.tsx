@@ -68,11 +68,11 @@ export function SystemHealthBar({ className = '' }: { className?: string }) {
 
   return (
     <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 ${className}`}>
-      <ServiceDot name="Venice AI" health={services.venice} />
-      <ServiceDot name="1Shot relay" health={services.oneshot} />
-      <ServiceDot name="Chain" health={services.chain} />
+      <ServiceDot name="AI service" health={services.venice} />
+      <ServiceDot name="Transaction relay" health={services.oneshot} />
+      <ServiceDot name="Network" health={services.chain} />
       <ServiceDot name="Agent wallet" health={services.wallet} />
-      <ServiceDot name="Subgraph" health={services.subgraph} />
+      <ServiceDot name="History index" health={services.subgraph} />
       <button
         onClick={refresh}
         className="ml-auto text-xs text-forge-text-subtle hover:text-forge-text transition-colors"

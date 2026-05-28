@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'ForgeOS',
-  description: 'Zero-knowledge agent OS on MetaMask Smart Accounts',
+  description: 'Run AI agents with spending limits and permissions you control',
 }
 
 export default function RootLayout({

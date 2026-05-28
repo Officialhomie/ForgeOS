@@ -1,6 +1,7 @@
 'use client'
 
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Delegation } from '@/types'
 
 interface DelegationsStore {
@@ -16,13 +17,26 @@ interface DelegationsStore {
   setLoading: (loading: boolean) => void
 }
 
-export const useDelegationsStore = create<DelegationsStore>((set) => ({
-  delegations: [],
-  subDelegation: null,
-  reDelegation: null,
-  loading: false,
-  setDelegations: (delegations) => set({ delegations }),
-  setSubDelegation: (subDelegation) => set({ subDelegation }),
-  setReDelegation: (reDelegation) => set({ reDelegation }),
-  setLoading: (loading) => set({ loading }),
-}))
+export const useDelegationsStore = create<DelegationsStore>()(
+  persist(
+    (set) => ({
+      delegations: [],
+      subDelegation: null,
+      reDelegation: null,
+      loading: false,
+      setDelegations: (delegations) => set({ delegations }),
+      setSubDelegation: (subDelegation) => set({ subDelegation }),
+      setReDelegation: (reDelegation) => set({ reDelegation }),
+      setLoading: (loading) => set({ loading }),
+    }),
+    {
+      name: 'forgeos-delegations',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        delegations: state.delegations,
+        subDelegation: state.subDelegation,
+        reDelegation: state.reDelegation,
+      }),
+    },
+  ),
+)

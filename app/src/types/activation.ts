@@ -53,10 +53,10 @@ export const DEFAULT_POLICY_PREVIEW: ActivationPolicyPreview = {
   maxSingleTxUsdc: '200',
   expiryLabel: '30 days from activation',
   caveats: [
-    'Allowed actions: run tasks and pass access to sub-agents',
-    'Spending limit: max 500 USDC per month',
-    'Expires: valid for 30 days',
-    'Restricted to: approved DeFi and payment services only',
+    'Can run tasks and let trusted agents help',
+    'Spending limit: up to 500 USDC per month',
+    'Expires after 30 days (you can renew)',
+    'Only approved finance and payment actions',
   ],
 }
 

@@ -20,6 +20,7 @@ import type { Address as ViemAddress } from 'viem'
 import { CONTRACTS } from '@/lib/contracts'
 import { ACTIVATION_CHAIN_ID } from '@/types/activation'
 import type { Address, Delegation, Hash } from '@/types'
+import { normalizeBytes32 } from '@/lib/delegation/normalize-for-encoding'
 
 function getEnv() {
   return getSmartAccountsEnvironment(ACTIVATION_CHAIN_ID)
@@ -136,7 +137,7 @@ export function subDelegationToForge(
       decodedTerms: {},
       humanReadable: 'On-chain caveat',
     })),
-    salt: kitDel.salt,
+    salt: normalizeBytes32(kitDel.salt),
     signature,
     hop,
     status: 'active',

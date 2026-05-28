@@ -48,7 +48,7 @@ export function CommandBarModal() {
     abortRef.current?.abort()
     abortRef.current = new AbortController()
 
-    setCommand({ status: 'reasoning', intent, error: null })
+    setCommand({ status: 'reasoning', intent, error: null, errorCode: null })
     setPendingPlan(null)
 
     try {
@@ -68,11 +68,14 @@ export function CommandBarModal() {
         setCommand({ status: 'planning', actionPlan: plan, timing: data.timing ?? null })
         setPendingPlan(plan)
       } else {
-        setCommand({ status: 'failed', error: data.error })
+        // #region agent log
+        fetch('http://127.0.0.1:7382/ingest/ac790453-c85d-4969-8a8c-a39f7089e0c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'076bd8'},body:JSON.stringify({sessionId:'076bd8',location:'CommandBarModal.tsx:handleSubmit',message:'command API error',data:{code:data.code,error:(data.error??'').slice(0,300),status:res.status},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
+        setCommand({ status: 'failed', error: data.error, errorCode: data.code })
       }
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {
-        setCommand({ status: 'failed', error: 'Request failed — check console' })
+        setCommand({ status: 'failed', error: 'Could not reach the server. Check your connection and try again.', errorCode: 'NETWORK' })
       }
     }
   }, [query, command.status, setCommand, setPendingPlan])
@@ -116,7 +119,7 @@ export function CommandBarModal() {
     } else {
       setCommand({
         status: 'failed',
-        error: match.description || 'Transaction rejected on-chain',
+        error: match.description || 'The network rejected this transaction',
       })
     }
   }, [activityFeed, command.status, setCommand, setOpen, resetCommand])
@@ -151,7 +154,7 @@ export function CommandBarModal() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') void handleSubmit() }}
-              placeholder="Ask ForgeOS anything… e.g. rebalance to 60% ETH"
+              placeholder="Tell your agents what to do… e.g. check my portfolio balance"
               className="flex-1 bg-transparent text-sm text-forge-text placeholder:text-forge-text-subtle focus:outline-none"
             />
             {command.status === 'reasoning' && <Spinner />}
@@ -161,19 +164,19 @@ export function CommandBarModal() {
           <div className="min-h-[80px] p-4">
             {command.status === 'idle' && (
               <p className="text-sm text-forge-text-subtle">
-                Type a command and press Enter. Venice AI will plan the action.
+                Describe what you want in plain language, then press Enter. We will show you a plan before anything runs.
               </p>
             )}
 
             {command.status === 'reasoning' && (
-              <p className="text-sm text-forge-text-muted">Parsing intent with Venice AI…</p>
+              <p className="text-sm text-forge-text-muted">Understanding your request…</p>
             )}
 
             {command.status === 'failed' && (
               <div className="space-y-1">
                 <p className="text-sm font-medium text-red-400">Something went wrong</p>
                 <p className="text-xs text-red-400/80">
-                  {friendlyCommandError(command.error)}
+                  {friendlyCommandError(command.error, command.errorCode)}
                 </p>
               </div>
             )}
@@ -188,7 +191,7 @@ export function CommandBarModal() {
 
             {command.status === 'executing' && command.oneShotTaskId && (
               <div className="space-y-1">
-                <p className="text-sm text-forge-text-muted">Waiting for 1Shot confirmation…</p>
+                <p className="text-sm text-forge-text-muted">Waiting for the network to confirm…</p>
                 <p className="font-mono text-xs text-forge-text-subtle">
                   task: {command.oneShotTaskId}
                 </p>
@@ -200,7 +203,7 @@ export function CommandBarModal() {
                 <p className="text-sm font-medium text-green-400">Transaction confirmed</p>
                 {command.oneShotTaskId && (
                   <p className="font-mono text-xs text-forge-text-muted">
-                    1Shot task: {command.oneShotTaskId}
+                    Reference: {command.oneShotTaskId}
                   </p>
                 )}
               </div>
@@ -210,7 +213,7 @@ export function CommandBarModal() {
           {/* ── Footer hint ── */}
           <div className="flex items-center justify-between border-t border-forge-border px-4 py-2">
             <span className="text-xs text-forge-text-subtle">
-              Powered by Venice AI · Gas sponsored by 1Shot{command.timing && command.timing.steps.venice != null && (<span className="ml-2 opacity-60"> · Venice {command.timing.steps.venice}ms · Total {command.timing.totalMs}ms</span>)}
+              AI planning and network fees are handled for you{command.timing && command.timing.steps.venice != null && (<span className="ml-2 opacity-60"> · {command.timing.totalMs}ms total</span>)}
             </span>
             <kbd className="rounded border border-forge-border bg-forge-bg px-1.5 py-0.5 font-mono text-xs text-forge-text-subtle">
               Esc
@@ -236,6 +239,12 @@ function ActionPlanPreview({
   return (
     <div className="space-y-3">
       <p className="text-sm font-medium">{plan.summary}</p>
+
+      {plan.actions.length === 0 ? (
+        <pre className="whitespace-pre-wrap rounded-lg border border-forge-border bg-forge-bg p-3 font-mono text-xs text-forge-text-muted">
+          {plan.summary}
+        </pre>
+      ) : null}
 
       <ul className="space-y-1">
         {plan.actions.map((action) => (
@@ -264,7 +273,7 @@ function ActionPlanPreview({
         <Button
           variant="default"
           className={cn('shrink-0', !plan.withinPolicy && 'opacity-50')}
-          disabled={executing || !plan.withinPolicy}
+          disabled={executing || !plan.withinPolicy || plan.actions.length === 0}
           onClick={onExecute}
         >
           {executing ? 'Submitting…' : 'Execute'}
@@ -312,19 +321,25 @@ function Spinner() {
 
 // ─── ERROR HELPERS ────────────────────────────────────────────────────────────
 
-function friendlyCommandError(raw: string | null | undefined): string {
+function friendlyCommandError(raw: string | null | undefined, code?: string | null): string {
+  if (code === 'WALLET_UNCONFIGURED') {
+    return raw ?? 'Server agent wallet is not configured. Add AGENT_WALLET_KEY to app/.env.local and restart the dev server.'
+  }
+  if (code === 'TURNKEY_SIGN_FAILED' || code === 'WALLET_SIGN_FAILED' || code === 'WALLET_NETWORK_ERROR') {
+    return raw ?? 'The agent wallet could not sign the Venice request.'
+  }
+  if (code === 'VENICE_BALANCE_LOW') {
+    return raw ?? 'Venice AI prepaid balance is empty. Top up USDC on Base for the server agent wallet (see Venice x402 docs).'
+  }
+  if (code === 'TREASURY_LOW' || code === 'INSUFFICIENT_TREASURY') {
+    return 'Your spending pool is too low for this action. Add funds on the Spending page.'
+  }
   if (!raw) return 'Unknown error. Please try again.'
-  if (raw.includes('Agent wallet not configured') || raw.includes('AGENT_WALLET_KEY')) {
-    return 'The server agent wallet is not set up. Add AGENT_WALLET_KEY to your .env.local and restart the dev server.'
-  }
-  if (raw.includes('signing failed') || raw.includes('Failed to sign') || raw.includes('fetch failed')) {
-    return 'The agent wallet could not sign the request — check your server wallet configuration (AGENT_WALLET_KEY or Turnkey credentials).'
-  }
   if (raw.includes('Treasury balance') || raw.includes('INSUFFICIENT_TREASURY')) {
-    return 'Your treasury balance is too low to pay for AI inference. Top up from the Treasury page.'
+    return 'Your spending pool is too low for this action. Add funds on the Spending page.'
   }
-  if (raw.includes('Venice API') || raw.includes('VENICE_ERROR')) {
-    return 'Venice AI returned an error. Check your API connection and try again.'
+  if (raw.includes('Venice API')) {
+    return 'The AI service returned an error. Try again in a moment.'
   }
   return raw
 }

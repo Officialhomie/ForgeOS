@@ -70,7 +70,7 @@ export function CaveatPreview({
 
       <details className="group">
         <summary className="cursor-pointer text-xs text-forge-text-subtle hover:text-forge-text">
-          Show technical details
+          Show developer details
         </summary>
         <pre className="mt-2 overflow-x-auto rounded border border-forge-border-subtle bg-forge-surface p-2 font-mono text-xs text-forge-mono">
           {JSON.stringify(

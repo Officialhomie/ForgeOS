@@ -25,22 +25,22 @@ export default function TreasuryPage() {
     <div className="mx-auto max-w-7xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Treasury</h1>
+          <h1 className="text-2xl font-bold">Money & Spending</h1>
           <p className="mt-1 text-sm text-forge-text-muted">
-            Ethereum Sepolia USDC balance, x402 spend history, and agent economics
+            How much your agents have spent, what&apos;s left, and where the money went
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button onClick={() => setTopUpOpen(true)}>Top up</Button>
+          <Button onClick={() => setTopUpOpen(true)}>Add funds</Button>
         </div>
       </div>
 
       {!isGraphEnabled() && (
         <p className="rounded-lg border border-forge-warning/40 bg-forge-warning/10 px-4 py-2 text-sm text-forge-warning">
-          Set NEXT_PUBLIC_SUBGRAPH_URL for live indexed history.
+          Payment history isn&apos;t live yet — but your balance still updates in real time.
         </p>
       )}
 
@@ -51,12 +51,12 @@ export default function TreasuryPage() {
       )}
 
       {loading || !treasury ? (
-        <p className="text-forge-text-muted">Loading treasury…</p>
+        <p className="text-forge-text-muted">Loading your balance…</p>
       ) : (
         <>
           <div className="grid gap-6 lg:grid-cols-3">
             <div className="rounded-xl border border-forge-border bg-forge-surface p-5 lg:col-span-1">
-              <p className="text-sm text-forge-text-muted">Available USDC (Base Sepolia)</p>
+              <p className="text-sm text-forge-text-muted">Available to spend</p>
               <p className="mt-2 text-3xl font-bold">
                 <TokenAmount amount={treasury.usdcBalance} />
               </p>
@@ -68,7 +68,7 @@ export default function TreasuryPage() {
             </div>
 
             <div className="rounded-xl border border-forge-border bg-forge-surface p-5 lg:col-span-2">
-              <h2 className="font-semibold">Balance breakdown</h2>
+              <h2 className="font-semibold">Where your money is</h2>
               <TreasuryDonut
                 available={treasury.usdcBalance}
                 spent={treasury.totalSpent}
@@ -79,34 +79,34 @@ export default function TreasuryPage() {
 
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="rounded-xl border border-forge-border bg-forge-surface p-5">
-              <h2 className="font-semibold">30-day x402 activity</h2>
+              <h2 className="font-semibold">Spending this month</h2>
               <div className="mt-4">
                 <ActivityBarChart dailySpend={dailySpend} />
               </div>
             </div>
 
             <div className="rounded-xl border border-forge-border bg-forge-surface p-5">
-              <h2 className="font-semibold">Earnings split (last distribution)</h2>
+              <h2 className="font-semibold">How your earnings are split</h2>
               <ul className="mt-4 space-y-3 text-sm">
                 <li className="flex justify-between text-forge-text-muted">
-                  <span>User (80%)</span>
+                  <span>You keep (80%)</span>
                   <span>{formatUsdc(treasury.earningsBreakdown.userShare)}</span>
                 </li>
                 <li className="flex justify-between text-forge-text-muted">
-                  <span>Treasury refill (15%)</span>
+                  <span>Auto-refills your balance (15%)</span>
                   <span>
                     {formatUsdc(treasury.earningsBreakdown.treasuryShare)}
                   </span>
                 </li>
                 <li className="flex justify-between text-forge-text-muted">
-                  <span>Platform (5%)</span>
+                  <span>Platform fee (5%)</span>
                   <span>
                     {formatUsdc(treasury.earningsBreakdown.platformShare)}
                   </span>
                 </li>
               </ul>
               <p className="mt-4 text-xs text-forge-text-subtle">
-                Net profit (indexed): {formatUsdc(treasury.netProfit)}
+                Your take-home: {formatUsdc(treasury.netProfit)}
               </p>
             </div>
           </div>
@@ -114,7 +114,7 @@ export default function TreasuryPage() {
           <div className="rounded-xl border border-forge-border bg-forge-surface p-5">
             <h2 className="font-semibold">Recent payments</h2>
             <p className="mt-1 text-xs text-forge-text-muted">
-              Venice / agent payees — from The Graph treasury events
+              Payments your agents made to services and recipients
             </p>
             <div className="mt-4">
               <RecentPaymentsTable payments={recentPayments} />

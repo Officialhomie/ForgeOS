@@ -39,7 +39,7 @@ export function ActivityBarChart({
           <Tooltip
             formatter={(value) => [
               `$${Number(value ?? 0).toFixed(2)}`,
-              'x402 spend',
+              'Spending',
             ]}
             contentStyle={{
               background: '#18181b',
@@ -51,7 +51,7 @@ export function ActivityBarChart({
         </BarChart>
       </ResponsiveContainer>
       <p className="mt-2 text-center text-xs text-forge-text-subtle">
-        Daily x402 / agent payments (last 30 days)
+        Daily agent payments (last 30 days)
       </p>
     </div>
   )

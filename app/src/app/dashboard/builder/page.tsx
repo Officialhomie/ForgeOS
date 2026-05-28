@@ -18,10 +18,10 @@ function StepIndicator({
 }) {
   const steps = [
     { key: 'idle', label: 'Pick a type' },
-    { key: 'configuring', label: 'Customise' },
-    { key: 'testing', label: 'Test' },
+    { key: 'configuring', label: 'Set up' },
+    { key: 'testing', label: 'Try it' },
     { key: 'approving', label: 'Approve' },
-    { key: 'publishing', label: 'Publish' },
+    { key: 'publishing', label: 'Launch' },
     { key: 'deployed', label: 'Done' },
   ]
 
@@ -89,9 +89,9 @@ function LaunchedView({
       </div>
 
       <div>
-        <h2 className="text-xl font-bold text-forge-text">Your agent is live</h2>
+        <h2 className="text-xl font-bold text-forge-text">Your agent is up and running!</h2>
         <p className="mt-1 text-sm text-forge-text-muted">
-          It will start running automatically in the background.
+          It is working in the background now. Sit back and relax.
         </p>
       </div>
 
@@ -102,13 +102,13 @@ function LaunchedView({
         </div>
         {taskId && (
           <div>
-            <p className="text-xs text-forge-text-subtle">Transaction ID</p>
+            <p className="text-xs text-forge-text-subtle">Confirmation ID</p>
             <p className="mt-0.5 font-mono text-sm text-forge-text">{taskId}</p>
           </div>
         )}
         {ipfsUri && (
           <div>
-            <p className="text-xs text-forge-text-subtle">Profile link</p>
+            <p className="text-xs text-forge-text-subtle">Public profile link</p>
             <p className="mt-0.5 break-all font-mono text-xs text-forge-text">{ipfsUri}</p>
           </div>
         )}
@@ -116,10 +116,10 @@ function LaunchedView({
 
       <div className="flex gap-3">
         <Button variant="secondary" className="flex-1" onClick={onReset}>
-          Build another
+          Start fresh
         </Button>
         <Button variant="default" className="flex-1" onClick={() => { window.location.href = '/marketplace' }}>
-          View marketplace
+          Browse marketplace
         </Button>
       </div>
     </div>
@@ -157,9 +157,9 @@ export default function BuilderPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-forge-text">Agent Builder</h1>
+          <h1 className="text-2xl font-bold text-forge-text">Create an agent</h1>
           <p className="mt-1 text-sm text-forge-text-muted">
-            Build your own AI agent, set its rules, and let it work for you automatically.
+            Choose what you want your agent to do, set how much it can spend, and let it run hands-free.
           </p>
         </div>
         {step !== 'idle' && step !== 'deployed' && (
@@ -177,7 +177,7 @@ export default function BuilderPage() {
       {/* Step 1 — Pick a type */}
       {step === 'idle' && (
         <div className="space-y-4">
-          <h2 className="text-base font-semibold text-forge-text">What should your agent do?</h2>
+          <h2 className="text-base font-semibold text-forge-text">What do you want your agent to do?</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {AGENT_TEMPLATES.map((template) => (
               <TemplateCard
@@ -196,9 +196,9 @@ export default function BuilderPage() {
           {/* Left: form */}
           <div className="space-y-4">
             <div>
-              <h2 className="text-base font-semibold text-forge-text">Set up your agent</h2>
+              <h2 className="text-base font-semibold text-forge-text">Make it yours</h2>
               <p className="mt-0.5 text-sm text-forge-text-muted">
-                Adjust how your agent behaves — its spending limits are set from your settings below.
+                Tell the agent how to behave and how much it is allowed to spend.
               </p>
             </div>
             <AgentConfigForm
@@ -218,14 +218,14 @@ export default function BuilderPage() {
           <div className="space-y-4">
             <div>
               <span className="inline-flex items-center gap-1.5 text-base font-semibold text-forge-text">
-              What your agent is allowed to do
+              What this agent can and cannot do
               <Tooltip
-                content="This is a live preview of your agent's safety rules. Every rule listed here will be permanently enforced — the agent cannot go beyond what you see, even if you later ask it to."
+                content="These are the hard limits for this agent. It cannot spend more, run more often, or do more than what you see here."
                 side="top"
               />
             </span>
               <p className="mt-0.5 text-sm text-forge-text-muted">
-                These limits are enforced automatically — the agent can never exceed them.
+                These are hard limits. The agent can never do more than what you see here, no matter what.
               </p>
             </div>
             <CaveatPreview
@@ -241,31 +241,31 @@ export default function BuilderPage() {
             )}
 
             {testResult && (
-              <div className="rounded-lg border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-300">
-                Test OK: {testResult}
-              </div>
+            <div className="rounded-lg border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-300">
+            Looking good: {testResult}
+            </div>
             )}
 
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" onClick={saveDraft}>
-                Save draft
+                Save for later
               </Button>
               <Button variant="secondary" onClick={() => void testAgent()}>
-                Test agent
+                Try it out
               </Button>
               <Button variant="secondary" onClick={() => void approveAgent()}>
-                Approve permissions
+                Grant access
               </Button>
             </div>
 
             <div className="space-y-1">
               <Button variant="default" className="w-full" onClick={deployAgent}>
-                Publish to marketplace
+                Launch agent
               </Button>
               <p className="flex items-center justify-center gap-1 text-xs text-forge-text-subtle">
-                Your wallet will confirm — then the agent starts automatically
+                You will tap Approve in your wallet — just once
                 <Tooltip
-                  content="Launching registers your agent on-chain and grants it the permissions you configured above. Your wallet will prompt you to approve. Once done, the agent will run on its own schedule with no further input needed from you."
+                  content="Publishing saves your agent so others can find it. After you approve in your wallet, the agent can run on the schedule you set."
                   side="top"
                 />
               </p>
@@ -279,9 +279,9 @@ export default function BuilderPage() {
         <div className="flex flex-col items-center justify-center gap-4 py-20">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
           <p className="text-sm text-forge-text-muted">
-            {step === 'testing' && 'Running dry simulation…'}
-            {step === 'approving' && 'Waiting for MetaMask approval…'}
-            {step === 'publishing' && 'Publishing to registry…'}
+            {step === 'testing' && 'Checking everything looks right…'}
+            {step === 'approving' && 'Waiting for your OK in MetaMask…'}
+            {step === 'publishing' && 'Launching your agent…'}
           </p>
         </div>
       )}

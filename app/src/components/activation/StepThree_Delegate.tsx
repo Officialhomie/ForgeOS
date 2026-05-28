@@ -59,7 +59,7 @@ export function StepThree_Delegate() {
             </div>
             <p className="mt-1 text-xs text-forge-danger/80">
               Your wallet is no longer connected. Go back to Step 1 to reconnect
-              before signing the delegation.
+              before you approve in your wallet.
             </p>
             <button
               onClick={goBack}
@@ -91,7 +91,7 @@ export function StepThree_Delegate() {
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-forge-text-muted">Access level</dt>
-              <dd className="text-forge-text">Full (you can revoke anytime)</dd>
+              <dd className="text-forge-text">Full (you can remove anytime)</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-forge-text-muted">Monthly cap</dt>
@@ -104,9 +104,7 @@ export function StepThree_Delegate() {
           </dl>
           <ul className="mt-2 space-y-1 border-t border-forge-border-subtle pt-3 text-xs text-forge-text-subtle">
             {DEFAULT_POLICY_PREVIEW.caveats.map((c) => (
-              <li key={c} className="font-mono">
-                · {c}
-              </li>
+              <li key={c}>· {c}</li>
             ))}
           </ul>
         </div>
@@ -142,7 +140,7 @@ export function StepThree_Delegate() {
         )}
 
         <p className="text-xs text-forge-text-subtle">
-          You can revoke this from the dashboard at any time — one click stops all your agents immediately.
+          You can remove this from the dashboard at any time — one click stops all your agents immediately.
         </p>
 
         <div className="flex flex-wrap gap-3">

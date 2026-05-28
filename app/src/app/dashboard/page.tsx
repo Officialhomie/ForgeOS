@@ -24,9 +24,9 @@ export default function DashboardPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-forge-text">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-forge-text">Home</h1>
         <p className="mt-1 text-sm text-forge-text-muted">
-          Your agents, spending, and activity in real time
+          Everything in one place — what your agents are up to, what they have spent, and anything that needs you.
         </p>
       </div>
 
@@ -37,7 +37,7 @@ export default function DashboardPage() {
         <div className="col-span-12 rounded-xl border border-forge-border bg-forge-surface p-5 md:col-span-4">
           <span className="inline-flex items-center gap-1 text-xs text-forge-text-muted">
             Funds available
-            <Tooltip content="The amount of USDC in your agent treasury. Your agents spend from this balance automatically when they take actions. Top up any time from the Treasury page." side="bottom" />
+            <Tooltip content="Money your agents can spend. They draw from this pool when they run tasks. Add more anytime on the Spending page." side="bottom" />
           </span>
           {treasuryLoading ? (
             <LoadingSkeleton className="mt-2 h-9 w-32" />
@@ -52,7 +52,7 @@ export default function DashboardPage() {
         <div className="col-span-12 rounded-xl border border-forge-border bg-forge-surface p-5 md:col-span-4">
           <span className="inline-flex items-center gap-1 text-xs text-forge-text-muted">
             Agents running
-            <Tooltip content="How many of your agents are currently active and taking automated actions in the background. Each agent runs on its own schedule." side="bottom" />
+            <Tooltip content="Agents that are turned on and may run on their own schedule in the background." side="bottom" />
           </span>
           <p className="mt-2 text-3xl font-bold tabular-nums">
             {agentsLoading ? '—' : activeAgents.length}
@@ -60,8 +60,8 @@ export default function DashboardPage() {
         </div>
         <div className="col-span-12 rounded-xl border border-forge-border bg-forge-surface p-5 md:col-span-4">
           <span className="inline-flex items-center gap-1 text-xs text-forge-text-muted">
-            Active permissions
-            <Tooltip content="The number of agents you have approved to act on your behalf. Each permission has strict rules about what that agent is allowed to do. You can revoke any of them at any time." side="bottom" />
+            Active approvals
+            <Tooltip content="How many agents you have allowed to act for you, each with limits you set. You can turn any of them off at any time." side="bottom" />
           </span>
           <p className="mt-2 text-3xl font-bold tabular-nums">
             {delegations.filter((d) => d.status === 'active').length}
@@ -78,11 +78,11 @@ export default function DashboardPage() {
           </div>
         ) : agents.length === 0 ? (
           <EmptyState
-            title="No agents"
-            description="Get started by activating your account. Your agents will appear here."
+            title="No agents yet"
+            description="Pick an agent from the marketplace or build your own — it only takes a minute to get started."
             action={
-              <Link href="/activate">
-                <Button>Activate</Button>
+              <Link href="/marketplace">
+                <Button>Browse agents</Button>
               </Link>
             }
           />
@@ -117,7 +117,7 @@ export default function DashboardPage() {
       </section>
 
       <section className="rounded-xl border border-forge-border bg-forge-surface p-5">
-        <h2 className="text-base font-semibold">Recent activity</h2>
+        <h2 className="text-base font-semibold">What happened lately</h2>
         <ul className="mt-4 space-y-3">
           {activity.slice(0, 5).map((event) => (
             <li key={event.id} className="flex justify-between text-sm">

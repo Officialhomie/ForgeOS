@@ -10,6 +10,8 @@ import { IOSKernel } from "./interfaces/IOSKernel.sol";
 
 /// @title AgentTreasury
 /// @notice USDC treasury for agent x402 payments with ERC-7710 delegation proof validation.
+/// @dev Each user's balance is tracked independently. Funds can only be spent by the
+///      protocol on behalf of the depositing user, or withdrawn by the user directly.
 contract AgentTreasury is IAgentTreasury, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -21,9 +23,19 @@ contract AgentTreasury is IAgentTreasury, Ownable, ReentrancyGuard {
     IOSKernel public immutable kernel;
     address public platformFeeRecipient;
 
+    /// @notice Total USDC held by the contract across all users.
     uint256 public totalBalance;
+
+    /// @notice Per-user USDC balance. Credited by fund(), debited by executePayment() or withdraw().
+    mapping(address => uint256) public userBalance;
+
+    /// @notice Refill pool accumulates 15% of every payment for auto-refills.
     uint256 public refillPool;
+
+    /// @notice Per-agent spend cap (0 = unlimited).
     mapping(bytes32 => uint256) public agentBudgets;
+
+    /// @notice Per-agent total USDC spent since deployment.
     mapping(bytes32 => uint256) public agentSpend;
 
     constructor(address usdc_, address kernel_, address platformFeeRecipient_, address initialOwner)
@@ -37,12 +49,27 @@ contract AgentTreasury is IAgentTreasury, Ownable, ReentrancyGuard {
     /// @inheritdoc IAgentTreasury
     function fund(uint256 amount) external nonReentrant {
         _usdc.safeTransferFrom(msg.sender, address(this), amount);
+        userBalance[msg.sender] += amount;
         totalBalance += amount;
         emit TreasuryFunded(msg.sender, amount);
     }
 
     /// @inheritdoc IAgentTreasury
-    function executePayment(address payee, uint256 amount, bytes32 agentId, bytes calldata proof)
+    function withdraw(uint256 amount) external nonReentrant {
+        uint256 available = userBalance[msg.sender];
+        if (available < amount) revert InsufficientUserBalance(msg.sender, amount, available);
+        if (totalBalance < amount) revert InsufficientBalance(amount, totalBalance);
+
+        userBalance[msg.sender] -= amount;
+        totalBalance -= amount;
+
+        _usdc.safeTransfer(msg.sender, amount);
+        emit TreasuryWithdrawn(msg.sender, amount);
+    }
+
+    /// @inheritdoc IAgentTreasury
+    /// @param user The user whose balance is debited for this payment.
+    function executePayment(address payee, uint256 amount, bytes32 agentId, bytes calldata proof, address user)
         external
         onlyOwner
         nonReentrant
@@ -54,12 +81,16 @@ contract AgentTreasury is IAgentTreasury, Ownable, ReentrancyGuard {
         if (budget > 0 && agentSpend[agentId] + amount > budget) {
             revert BudgetExceeded(agentId, agentSpend[agentId] + amount, budget);
         }
+
+        uint256 available = userBalance[user];
+        if (available < amount) revert InsufficientUserBalance(user, amount, available);
         if (totalBalance < amount) revert InsufficientBalance(amount, totalBalance);
 
         uint256 platformShare = (amount * PLATFORM_FEE_BPS) / 10_000;
         uint256 refillShare = (amount * REFILL_BPS) / 10_000;
         uint256 userShare = (amount * USER_BPS) / 10_000;
 
+        userBalance[user] -= amount;
         totalBalance -= amount;
         agentSpend[agentId] += amount;
         refillPool += refillShare;
@@ -69,7 +100,7 @@ contract AgentTreasury is IAgentTreasury, Ownable, ReentrancyGuard {
             _usdc.safeTransfer(platformFeeRecipient, platformShare);
         }
 
-        emit PaymentExecuted(payee, amount, agentId);
+        emit PaymentExecuted(payee, amount, agentId, user);
         emit RevenueDistributed(userShare, refillShare, platformShare);
     }
 
@@ -82,6 +113,11 @@ contract AgentTreasury is IAgentTreasury, Ownable, ReentrancyGuard {
     /// @inheritdoc IAgentTreasury
     function getBalance() external view returns (uint256 balance) {
         return totalBalance;
+    }
+
+    /// @inheritdoc IAgentTreasury
+    function getUserBalance(address user) external view returns (uint256 balance) {
+        return userBalance[user];
     }
 
     /// @inheritdoc IAgentTreasury

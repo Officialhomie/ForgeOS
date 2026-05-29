@@ -1,6 +1,10 @@
 'use client'
 
 import { useAgentBuilder } from '@/hooks/useAgentBuilder'
+import { useOsStore } from '@/stores/os.store'
+import { ipfsUriToGatewayUrl } from '@/lib/ipfs/client'
+import { CopyButton } from '@/components/ui/CopyButton'
+import { truncateAddress } from '@/lib/utils'
 import { AGENT_TEMPLATES } from '@/lib/agents/templates'
 import { TemplateCard } from '@/components/builder/TemplateCard'
 import { AgentConfigForm } from '@/components/builder/AgentConfigForm'
@@ -67,19 +71,68 @@ function StepIndicator({
 
 // ─── SUCCESS SCREEN ───────────────────────────────────────────────────────────
 
+function LaunchedDetailRow({
+  label,
+  value,
+  variant = 'hash',
+}: {
+  label: string
+  value: string
+  variant?: 'hash' | 'url'
+}) {
+  const display =
+    variant === 'hash' && value.startsWith('0x')
+      ? truncateAddress(value, 10)
+      : variant === 'url'
+        ? value.replace(/^https?:\/\//, '').slice(0, 36) + (value.length > 40 ? '…' : '')
+        : value
+
+  return (
+    <div className="min-w-0">
+      <p className="text-xs text-forge-text-subtle">{label}</p>
+      <div className="mt-0.5 flex min-w-0 items-center gap-2">
+        {variant === 'url' ? (
+          <a
+            href={value}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={value}
+            className="min-w-0 flex-1 truncate text-left font-mono text-xs text-forge-orange hover:underline"
+          >
+            {display}
+          </a>
+        ) : (
+          <span
+            title={value}
+            className="min-w-0 flex-1 truncate text-left font-mono text-xs text-forge-text"
+          >
+            {display}
+          </span>
+        )}
+        <CopyButton value={value} />
+      </div>
+    </div>
+  )
+}
+
 function LaunchedView({
   agentId,
   taskId,
   ipfsUri,
+  metadataSource,
+  pinataError,
   onReset,
 }: {
   agentId: string
   taskId: string | null
   ipfsUri: string | null
+  metadataSource?: 'pinata' | 'inline'
+  pinataError?: string | null
   onReset: () => void
 }) {
+  const gatewayUrl = ipfsUri ? ipfsUriToGatewayUrl(ipfsUri) : null
   return (
-    <div className="mx-auto max-w-lg space-y-6 py-12 text-center">
+    <div className="mx-auto w-full max-w-md space-y-6 px-4 py-12 text-center">
       <div className="flex items-center justify-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10 ring-1 ring-green-500/20">
           <svg className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -95,23 +148,29 @@ function LaunchedView({
         </p>
       </div>
 
-      <div className="rounded-xl border border-forge-border bg-forge-surface p-4 text-left space-y-3">
-        <div>
-          <p className="text-xs text-forge-text-subtle">Agent ID</p>
-          <p className="mt-0.5 font-mono text-sm text-forge-text">{agentId}</p>
-        </div>
-        {taskId && (
-          <div>
-            <p className="text-xs text-forge-text-subtle">Confirmation ID</p>
-            <p className="mt-0.5 font-mono text-sm text-forge-text">{taskId}</p>
-          </div>
-        )}
+      <div className="min-w-0 overflow-hidden rounded-xl border border-forge-border bg-forge-surface p-4 text-left space-y-3">
+        <LaunchedDetailRow label="Agent ID (pending on-chain)" value={agentId} variant="hash" />
+        {taskId && <LaunchedDetailRow label="Confirmation ID" value={taskId} variant="hash" />}
         {ipfsUri && (
-          <div>
-            <p className="text-xs text-forge-text-subtle">Public profile link</p>
-            <p className="mt-0.5 break-all font-mono text-xs text-forge-text">{ipfsUri}</p>
-          </div>
+          <>
+            {metadataSource === 'inline' && (
+              <p className="text-xs text-amber-300">
+                IPFS pinning failed{pinataError ? `: ${pinataError}` : ''}. Metadata was stored
+                inline for this launch — restart dev server and try again for an{' '}
+                <span className="font-mono">ipfs://</span> link.
+              </p>
+            )}
+            {gatewayUrl ? (
+              <LaunchedDetailRow label="Public profile link" value={gatewayUrl} variant="url" />
+            ) : (
+              <LaunchedDetailRow label="Public profile" value={ipfsUri} variant="hash" />
+            )}
+          </>
         )}
+        <p className="text-xs text-forge-text-subtle">
+          The marketplace lists your agent after the relay confirms on Sepolia (usually under a minute).
+          Use Refresh on the marketplace page.
+        </p>
       </div>
 
       <div className="flex gap-3">
@@ -148,9 +207,11 @@ export default function BuilderPage() {
     testAgent,
     approveAgent,
     testResult,
+    draftSaved,
     deployAgent,
     reset,
   } = useAgentBuilder()
+  const rootDelegation = useOsStore((s) => s.rootDelegation)
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -246,6 +307,12 @@ export default function BuilderPage() {
             </div>
             )}
 
+            {draftSaved && (
+              <div className="rounded-lg border border-forge-border bg-forge-surface px-4 py-3 text-sm text-forge-text-muted">
+                Draft saved — reload this page and your template settings will restore.
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" onClick={saveDraft}>
                 Save for later
@@ -253,8 +320,17 @@ export default function BuilderPage() {
               <Button variant="secondary" onClick={() => void testAgent()}>
                 Try it out
               </Button>
-              <Button variant="secondary" onClick={() => void approveAgent()}>
-                Grant access
+              <Button
+                variant="secondary"
+                onClick={() => void approveAgent()}
+                disabled={!!rootDelegation}
+                title={
+                  rootDelegation
+                    ? 'OS activation already granted permissions — use Launch agent'
+                    : undefined
+                }
+              >
+                {rootDelegation ? 'Access granted (OS)' : 'Grant access'}
               </Button>
             </div>
 
@@ -292,6 +368,8 @@ export default function BuilderPage() {
           agentId={deployedAgent.agentId}
           taskId={deployedAgent.taskId}
           ipfsUri={deployedAgent.ipfsUri}
+          metadataSource={deployedAgent.metadataSource}
+          pinataError={deployedAgent.pinataError}
           onReset={reset}
         />
       )}

@@ -69,26 +69,44 @@ async function probeVenice(): Promise<ServiceHealth> {
 }
 
 async function probeOneshot(): Promise<ServiceHealth> {
-  if (!process.env.ONESHOT_API_KEY) {
-    return { status: 'unconfigured', latencyMs: null, detail: 'ONESHOT_API_KEY not set' }
-  }
-
   const start = Date.now()
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    const apiKey = process.env.ONESHOT_API_KEY
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`
+
     const res = await fetch(ONESHOT.RELAYER_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': process.env.ONESHOT_API_KEY,
-      },
-      body: JSON.stringify({ method: 'relayer_getCapabilities', params: [] }),
+      headers,
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'relayer_getCapabilities',
+        params: [String(ONESHOT.CHAIN_ID)],
+      }),
       signal: AbortSignal.timeout(5000),
     })
     const latencyMs = Date.now() - start
-    if (res.ok) {
-      return { status: 'ok', latencyMs }
+    const body = (await res.json()) as {
+      result?: Record<string, { tokens?: unknown[] }>
+      error?: { message: string }
     }
-    return { status: 'degraded', latencyMs, detail: `HTTP ${res.status}` }
+    const chainCap = body.result?.[String(ONESHOT.CHAIN_ID)]
+    if (res.ok && chainCap?.tokens?.length) {
+      return { status: 'ok', latencyMs, detail: ONESHOT.RELAYER_URL }
+    }
+    if (res.ok) {
+      return {
+        status: 'degraded',
+        latencyMs,
+        detail: `No payment tokens on chain ${ONESHOT.CHAIN_ID} (${ONESHOT.RELAYER_URL})`,
+      }
+    }
+    return {
+      status: 'degraded',
+      latencyMs,
+      detail: body.error?.message ?? `HTTP ${res.status}`,
+    }
   } catch (e) {
     return {
       status: isTimeoutError(e) ? 'degraded' : 'error',

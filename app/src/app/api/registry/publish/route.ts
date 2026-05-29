@@ -14,15 +14,24 @@
 import { NextResponse } from 'next/server'
 import { keccak256, toHex, encodeFunctionData } from 'viem'
 import { pinJson } from '@/lib/ipfs/client'
-import { send7710Transaction } from '@/lib/oneshot/client'
-import { ONESHOT } from '@/lib/constants'
-import { APP_URL } from '@/lib/constants'
+import { buildAndValidateUserOps } from '@/lib/delegation/proof-validation'
+import { rootDelegationNeedsRelayResign } from '@/lib/delegation/needs-relay-resign'
+import { getRelayTargetAddress, send7710Transaction } from '@/lib/oneshot/client'
+import { addPendingPublishedAgent, clearAgentsCache } from '@/lib/registry/registry-logs'
+import { ONESHOT, APP_URL } from '@/lib/constants'
+import type { Address, Delegation } from '@/types'
+
+function resolveWebhookUrl(): string {
+  const explicit = process.env.ONESHOT_WEBHOOK_URL?.trim()
+  if (explicit && !/trycloudflare\.com/i.test(explicit)) return explicit
+  return `${APP_URL}/api/webhooks/1shot`
+}
 
 // ─── CONTRACT ─────────────────────────────────────────────────────────────────
 
 const REGISTRY_ADDRESS =
   (process.env.NEXT_PUBLIC_REGISTRY_ADDRESS as `0x${string}`) ??
-  '0x4668B4Dd600FB4404783a9C73B6b4fcb71e78347'
+  '0xDE52F54c88510F9eC584f514CEAB4b965bbf2A68'
 
 const REGISTRY_ABI = [
   {
@@ -31,7 +40,7 @@ const REGISTRY_ABI = [
     stateMutability: 'nonpayable',
     inputs: [
       { name: 'name', type: 'string' },
-      { name: 'metadataUri', type: 'string' },
+      { name: 'endpoint', type: 'string' },
     ],
     outputs: [{ name: 'agentId', type: 'bytes32' }],
   },
@@ -45,7 +54,12 @@ interface PublishRequest {
   category: string
   promptTemplate: string
   caveatTemplate: object
+  /** Protocol / template agent address stored in metadata */
   agentAddress: string
+  /** User smart account (delegator) — required for 1Shot relay */
+  smartAccountAddress?: string
+  /** Root delegation from OS activation — required for gasless registerAgent */
+  signedDelegations?: Delegation[]
   configSchema?: object
 }
 
@@ -59,7 +73,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const { name, description, category, promptTemplate, caveatTemplate, agentAddress, configSchema } = body
+  const {
+    name,
+    description,
+    category,
+    promptTemplate,
+    caveatTemplate,
+    agentAddress,
+    smartAccountAddress,
+    signedDelegations = [],
+    configSchema,
+  } = body
 
   if (!name || !description || !agentAddress) {
     return NextResponse.json(
@@ -68,10 +92,14 @@ export async function POST(request: Request) {
     )
   }
 
-  if (!process.env.ONESHOT_API_KEY) {
+  if (!signedDelegations.length) {
     return NextResponse.json(
-      { success: false, error: 'ONESHOT_API_KEY not configured' },
-      { status: 503 },
+      {
+        success: false,
+        error:
+          'Complete OS activation first (root delegation required). Open /activate and finish the Permissions step, then try Launch again.',
+      },
+      { status: 400 },
     )
   }
 
@@ -92,7 +120,8 @@ export async function POST(request: Request) {
       createdAt: Math.floor(Date.now() / 1000),
     }
 
-    const ipfsUri = await pinJson(metadata)
+    const pin = await pinJson(metadata)
+    const ipfsUri = pin.uri
 
     // 2. Encode registerAgent calldata
     const callData = encodeFunctionData({
@@ -101,32 +130,69 @@ export async function POST(request: Request) {
       args: [name, ipfsUri],
     })
 
-    // 3. Dispatch via 1Shot relay
-    const webhookUrl = process.env.ONESHOT_WEBHOOK_URL ?? `${APP_URL}/api/webhooks/1shot`
+    // 3. Wrap in redeemDelegations + dispatch via 1Shot relay
+    const root = signedDelegations[0]
+    const relayTarget = await getRelayTargetAddress(ONESHOT.CHAIN_ID)
+    if (await rootDelegationNeedsRelayResign(root, ONESHOT.CHAIN_ID)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Your saved root delegation was signed for the wrong delegate (OSKernel). ' +
+            'Open /activate, go to Permissions, and sign again so the delegation targets the 1Shot relayer wallet. ' +
+            `Expected delegate ${relayTarget}, got ${root.delegate}.`,
+        },
+        { status: 400 },
+      )
+    }
+    const delegator = (smartAccountAddress ?? root.delegator) as Address
+
+    const userOps = buildAndValidateUserOps({
+      actions: [
+        {
+          id: 'registry_publish',
+          type: 'erc20_transfer',
+          agentId: 'defi-rebalancer',
+          delegationChain: [root.hash],
+          target: REGISTRY_ADDRESS,
+          calldata: callData,
+          value: 0n,
+          humanDescription: `Register marketplace agent "${name}"`,
+          estimatedOutput: name,
+          withinDelegationScope: true,
+          dependsOn: [],
+        },
+      ],
+      signedDelegations,
+      senderAddress: delegator,
+    })
 
     const { taskId } = await send7710Transaction({
       chainId: ONESHOT.CHAIN_ID,
-      userOps: [
-        {
-          sender: agentAddress,
-          callData,
-          target: REGISTRY_ADDRESS,
-          value: '0',
-          nonce: 0,
-          delegationChain: [],
-          delegationProofs: [],
-        },
-      ],
-      destinationUrl: webhookUrl,
+      userOps,
+      destinationUrl: resolveWebhookUrl(),
     })
 
-    // 4. Derive a deterministic agentId (matches what the contract emits)
+    // On-chain agentId is keccak256(abi.encode(msg.sender, name, block.timestamp)) — available after relay confirms.
     const agentId = keccak256(toHex(`${name}:${agentAddress}:${Math.floor(Date.now() / 1000)}`))
+
+    addPendingPublishedAgent({
+      agentId,
+      creator: delegator,
+      name,
+      metadataUri: ipfsUri,
+      metadata,
+      taskId,
+      publishedAt: Date.now(),
+    })
+    clearAgentsCache()
 
     return NextResponse.json({
       success: true,
       agentId,
       ipfsUri,
+      metadataSource: pin.source,
+      pinataError: pin.pinataError ?? null,
       taskId,
     })
   } catch (e) {

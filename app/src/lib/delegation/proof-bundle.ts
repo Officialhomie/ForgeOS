@@ -25,12 +25,20 @@ export class DelegationProofError extends Error {
   }
 }
 
+function isErc7715PermissionContext(sig: string): boolean {
+  if (!/^0x[0-9a-f]+$/i.test(sig)) return false
+  const hexLen = sig.length - 2
+  // MetaMask returns ERC-7715 permission context bytes (not a 65-byte ECDSA sig).
+  return hexLen > 130 && !PLACEHOLDER_SIGNATURES.has(sig)
+}
+
 export function isValidProof(d: Delegation): boolean {
   const sig = d.signature?.toLowerCase() ?? '0x'
   if (!sig || sig === '0x') return false
   if (PLACEHOLDER_SIGNATURES.has(sig)) return false
   if (sig === ONCHAIN_DELEGATION_MARKER.toLowerCase()) return true
-  return /^0x[0-9a-f]{130}$/i.test(sig)
+  if (/^0x[0-9a-f]{130}$/i.test(sig)) return true
+  return isErc7715PermissionContext(sig)
 }
 
 /**

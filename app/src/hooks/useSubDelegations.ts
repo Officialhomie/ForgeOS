@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useAccount } from 'wagmi'
 import { useOsStore } from '@/stores/os.store'
 import { useDelegationsStore } from '@/stores/delegations.store'
 import { createOSSubDelegations } from '@/lib/delegation/auto-delegate'
@@ -41,6 +42,7 @@ function markOnChainConfirmed(d: Delegation): Delegation {
 }
 
 export function useSubDelegations(): SubDelegationsState {
+  const { address } = useAccount()
   const rootDelegation = useOsStore((s) => s.rootDelegation)
   const subDelegation = useDelegationsStore((s) => s.subDelegation)
   const reDelegation = useDelegationsStore((s) => s.reDelegation)
@@ -97,7 +99,9 @@ export function useSubDelegations(): SubDelegationsState {
         ]
         setDelegations(all)
 
-        const smartAccount = useActivationStore.getState().smartAccountAddress
+        const smartAccount = address
+          ? useActivationStore.getState().getWallet(address).smartAccountAddress
+          : null
         if (smartAccount) {
           await fetch('/api/delegations/bundle', {
             method: 'POST',

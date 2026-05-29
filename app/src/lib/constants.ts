@@ -1,5 +1,6 @@
 import type { ChainId } from '@/types'
 import { FORGE_CHAIN_ID, VENICE_CHAIN_ID } from '@/lib/chains/network'
+import { resolveRelayerUrl } from '@/lib/oneshot/relayer-url'
 
 /** Primary testnet (Base Sepolia by default). */
 export const FORGE_CHAIN_ID_EXPORT = FORGE_CHAIN_ID satisfies ChainId
@@ -29,7 +30,8 @@ export const VENICE = {
 
 export const ONESHOT = {
   CHAIN_ID: parseInt(process.env.ONESHOT_CHAIN_ID ?? String(FORGE_CHAIN_ID), 10) as ChainId,
-  RELAYER_URL: process.env.ONESHOT_RELAYER_URL ?? 'https://relayer.1shotapi.com/relayers',
+  /** Sepolia/Base Sepolia → .dev; mainnet → .com unless ONESHOT_RELAYER_URL is set */
+  RELAYER_URL: resolveRelayerUrl(),
 } as const
 
 export const APP_URL =

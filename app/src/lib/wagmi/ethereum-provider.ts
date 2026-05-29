@@ -239,6 +239,16 @@ export function formatErc7715Error(error: unknown): string {
   const raw =
     error instanceof Error ? error.message : String(error ?? 'Unknown error')
 
+  if (
+    raw.includes('wallet_requestExecutionPermissions request is in process') ||
+    (typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code: unknown }).code === -32002)
+  ) {
+    return 'MetaMask is already showing a permission request. Close that popup, wait a moment, then try again (only one approval at a time).'
+  }
+
   const isMethodMissing =
     raw.includes('wallet_requestExecutionPermissions') ||
     raw.includes('does not exist') ||

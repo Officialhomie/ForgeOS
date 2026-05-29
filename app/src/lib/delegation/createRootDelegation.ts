@@ -10,6 +10,7 @@ import {
 } from '@metamask/smart-accounts-kit/utils'
 import type { Address as ViemAddress } from 'viem'
 import { CONTRACTS } from '@/lib/contracts'
+import { getRelayTargetAddress } from '@/lib/oneshot/client'
 import { ACTIVATION_CHAIN_ID } from '@/types/activation'
 import type { Address, Delegation, Hash, Policy } from '@/types'
 import { normalizeBytes32 } from '@/lib/delegation/normalize-for-encoding'
@@ -26,6 +27,9 @@ export async function createRootDelegationStruct(options: {
   policy?: Partial<Policy>
 }): Promise<KitDelegation> {
   const env = await getEnvironment()
+  const delegate =
+    options.delegate ??
+    (await getRelayTargetAddress(ACTIVATION_CHAIN_ID))
   const builder = createCaveatBuilder(env)
   const monthlyCap = options.policy?.monthlySpendCap ?? 500_000_000n
   const expiry =
@@ -46,7 +50,7 @@ export async function createRootDelegationStruct(options: {
   return createDelegation({
     environment: env,
     from: options.delegator,
-    to: options.delegate ?? CONTRACTS.osKernel,
+    to: delegate,
     scope: {
       type: ScopeType.Erc20PeriodTransfer,
       tokenAddress: CONTRACTS.usdc,

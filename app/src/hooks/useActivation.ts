@@ -7,6 +7,7 @@ import { useForgeWalletConnect } from '@/hooks/useForgeWalletConnect'
 import { erc7715ProviderActions } from '@metamask/smart-accounts-kit/actions'
 import { CONTRACTS } from '@/lib/contracts'
 import { buildActivationPermissions } from '@/lib/delegation/buildPermissions'
+import { getRelayTargetAddress } from '@/lib/oneshot/client'
 import {
   createRootDelegationStruct,
   kitDelegationToForge,
@@ -14,6 +15,8 @@ import {
 import { predictSmartAccountAddress } from '@/lib/smart-account/predictAddress'
 import { isStaleActivationState } from '@/lib/activation/stale-state'
 import { isOneShotUnavailableError } from '@/lib/activation/oneshot-unavailable'
+import { rootDelegationNeedsRelayResign } from '@/lib/delegation/needs-relay-resign'
+import { withErc7715Lock } from '@/lib/wallet/erc7715-lock'
 import { forgeChain } from '@/lib/wagmi/chains'
 import { ensureForgeChain } from '@/lib/wagmi/ensure-forge-chain'
 import {
@@ -27,7 +30,7 @@ import {
 } from '@/lib/wagmi/ethereum-provider'
 import { useOsStore } from '@/stores/os.store'
 import { useDelegationsStore } from '@/stores/delegations.store'
-import { useActivationStore } from '@/stores/activation.store'
+import { useActivationStore, INITIAL_WALLET } from '@/stores/activation.store'
 import type {
   ActivationPhase,
   ActivationStepId,
@@ -87,29 +90,56 @@ export function useActivation() {
   const { data: connectedWalletClient } = useWalletClient()
 
   const setOsStatus = useOsStore((s) => s.setOsStatus)
+  const rootDelegation = useOsStore((s) => s.rootDelegation)
   const setRootDelegation = useOsStore((s) => s.setRootDelegation)
   const setKernel = useOsStore((s) => s.setKernel)
   const setActivationStep = useOsStore((s) => s.setActivationStep)
   const setDelegations = useDelegationsStore((s) => s.setDelegations)
 
-  // Persisted state — managed by activationStore (auto-saved to localStorage via Zustand persist)
-  const phase = useActivationStore((s) => s.phase)
-  const completedSteps = useActivationStore((s) => s.completedSteps)
-  const smartAccountAddress = useActivationStore((s) => s.smartAccountAddress)
-  const deployTxHash = useActivationStore((s) => s.deployTxHash)
-  const fundTxHash = useActivationStore((s) => s.fundTxHash)
-  const oneShotTaskId = useActivationStore((s) => s.oneShotTaskId)
+  // ─── Per-wallet persisted state ─────────────────────────────────────────
+  // Read the current wallet's slice. Falls back to INITIAL_WALLET when address
+  // is not yet known or the wallet has no stored state.
+  const walletState = useActivationStore((s) =>
+    address ? (s.wallets[address.toLowerCase()] ?? INITIAL_WALLET) : INITIAL_WALLET,
+  )
 
-  // Transient UI state — not persisted
+  const { phase, completedSteps, smartAccountAddress, deployTxHash, fundTxHash, oneShotTaskId } =
+    walletState
+
+  // ─── Transient UI state (not persisted) ────────────────────────────────
+  // 'connecting' is ephemeral — address isn't known yet so we can't key
+  // it per wallet. We hold it in local state and merge into the derived phase.
+  const [connectPhase, setConnectPhase] = useState<'idle' | 'connecting'>('idle')
   const [error, setError] = useState<string | null>(null)
   const [fundAmountUsdc, setFundAmountUsdc] = useState('10')
   const fundAbortRef = useRef<AbortController | null>(null)
 
-  // On mount: validate stored activation state, reset if stale, sync osStore if active
+  // Derived phase: connecting takes priority during wallet connection flow.
+  const derivedPhase: ActivationPhase = connectPhase === 'connecting' ? 'connecting' : phase
+
+  // ─── Store helpers scoped to current wallet ─────────────────────────────
+  const patch = useCallback(
+    (update: Partial<typeof INITIAL_WALLET>) => {
+      if (!address) return
+      useActivationStore.getState().patchWallet(address, update)
+    },
+    [address],
+  )
+
+  const markComplete = useCallback(
+    (step: ActivationStepId) => {
+      if (!address) return
+      useActivationStore.getState().addWalletStep(address, step)
+    },
+    [address],
+  )
+
+  // ─── Mount: validate stored state for this wallet ───────────────────────
   useEffect(() => {
-    const stored = useActivationStore.getState()
+    if (!address) return
+    const stored = useActivationStore.getState().getWallet(address)
     if (isStaleActivationState(stored)) {
-      useActivationStore.getState().reset()
+      useActivationStore.getState().resetWallet(address)
       setOsStatus('inactive')
       setKernel(null)
       return
@@ -118,9 +148,41 @@ export function useActivation() {
       setOsStatus('active')
       setActivationStep(4)
     }
-  }, [setOsStatus, setActivationStep, setKernel])
+  }, [address, setOsStatus, setActivationStep, setKernel])
 
-  const currentStep = resolveCurrentStep(phase, completedSteps)
+  // Stale root delegation (OSKernel delegate) — reopen permissions so user can re-sign.
+  // Only on /activate so we do not clear delegation while user is on /dashboard/builder.
+  useEffect(() => {
+    if (!address || !rootDelegation) return
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/activate')) {
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const needsResign = await rootDelegationNeedsRelayResign(rootDelegation)
+      if (cancelled || !needsResign) return
+      const wallet = useActivationStore.getState().getWallet(address)
+      useActivationStore.getState().patchWallet(address, {
+        completedSteps: wallet.completedSteps.filter(
+          (s) => s !== 'permissions' && s !== 'fund',
+        ),
+        phase: 'idle',
+        delegationHash: null,
+      })
+      setRootDelegation(null)
+      setDelegations([])
+      setActivationStep(2)
+      setError(
+        'Your saved permissions use the old OSKernel delegate. Approve again below so gasless relay works.',
+      )
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [address, rootDelegation, setRootDelegation, setDelegations, setActivationStep])
+
+  // ─── Derived step state ─────────────────────────────────────────────────
+  const currentStep = resolveCurrentStep(derivedPhase, completedSteps)
   const currentStepIndex = stepIndex(currentStep)
 
   const steps: ActivationStepState[] = useMemo(
@@ -150,12 +212,12 @@ export function useActivation() {
         const idx = stepIndex(step.id)
         let status: ActivationStepState['status'] = 'pending'
         if (completedSteps.includes(step.id)) status = 'complete'
-        else if (idx === currentStepIndex && phase !== 'active') status = 'current'
+        else if (idx === currentStepIndex && derivedPhase !== 'active') status = 'current'
         else if (idx < currentStepIndex) status = 'complete'
-        if (phase === 'error' && idx === currentStepIndex) status = 'error'
+        if (derivedPhase === 'error' && idx === currentStepIndex) status = 'error'
         return { ...step, status, error: status === 'error' ? error ?? undefined : undefined }
       }),
-    [completedSteps, currentStepIndex, phase, error],
+    [completedSteps, currentStepIndex, derivedPhase, error],
   )
 
   const progressPercent = useMemo(() => {
@@ -163,61 +225,71 @@ export function useActivation() {
     return Math.min(100, Math.round((done / 4) * 100))
   }, [completedSteps])
 
-  const markComplete = useCallback((step: ActivationStepId) => {
-    useActivationStore.getState().addCompletedStep(step)
-  }, [])
-
+  // ─── Network helpers ────────────────────────────────────────────────────
   const ensureForgeNetwork = useCallback(async () => {
     if (chainId === ACTIVATION_CHAIN_ID) return
     await ensureForgeChain(switchChainAsync)
   }, [chainId, switchChainAsync])
 
+  // ─── Step 1: Connect wallet ─────────────────────────────────────────────
   const connectWallet = useCallback(async () => {
     setError(null)
-    useActivationStore.getState().setPhase('connecting')
+    setConnectPhase('connecting')
     try {
       await connectForgeWallet()
     } catch (e) {
-      useActivationStore.getState().setPhase('error')
+      setConnectPhase('idle')
       setError(formatWalletError(e))
     }
   }, [connectForgeWallet])
 
+  // After wagmi confirms connection, mark step complete and persist phase.
   useEffect(() => {
-    if (phase !== 'connecting' || !isConnected || !address) return
+    if (connectPhase !== 'connecting' || !isConnected || !address) return
     void (async () => {
       try {
         await ensureForgeChain(switchChainAsync)
         markComplete('connect')
-        useActivationStore.getState().setPhase('idle')
+        patch({ phase: 'idle' })
+        setConnectPhase('idle')
         setActivationStep(1)
       } catch (e) {
-        useActivationStore.getState().setPhase('error')
+        patch({ phase: 'error' })
+        setConnectPhase('idle')
         setError(formatWalletError(e))
       }
     })()
-  }, [phase, isConnected, address, markComplete, setActivationStep, switchChainAsync])
+  }, [connectPhase, isConnected, address, markComplete, patch, setActivationStep, switchChainAsync])
 
+  // ─── Step 2: Deploy smart account ──────────────────────────────────────
   const loadPredictedAddress = useCallback(async () => {
     if (!address) return null
     try {
       const predicted = await predictSmartAccountAddress(address)
-      useActivationStore.getState().setSmartAccountAddress(predicted)
+      patch({ smartAccountAddress: predicted })
       return predicted
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to predict smart account')
       return null
     }
-  }, [address])
+  }, [address, patch])
 
   const deploySmartAccount = useCallback(async () => {
     setError(null)
-    useActivationStore.getState().setPhase('deploying')
+    patch({ phase: 'deploying' })
     try {
       if (!address) throw new Error('Connect wallet first')
       await ensureForgeNetwork()
       const predicted = await loadPredictedAddress()
       if (!predicted) throw new Error('Could not resolve smart account address')
+
+      // Stateless7702 uses the connected EOA as the smart account — no 7710 relay before permissions.
+      if (predicted.toLowerCase() === address.toLowerCase()) {
+        patch({ smartAccountAddress: predicted, phase: 'idle' })
+        markComplete('deploy')
+        setActivationStep(2)
+        return
+      }
 
       let taskId: string | null = null
       let txHash: Hash | undefined
@@ -241,33 +313,36 @@ export function useActivation() {
         txHash = data.txHash
       } else {
         const relayError = data.error ?? 'Deploy relay failed'
-        if (!isOneShotUnavailableError(relayError)) {
+        const needsDelegationFirst =
+          /permissionContext|signed ERC-7710 delegation/i.test(relayError)
+        if (
+          !isOneShotUnavailableError(relayError) &&
+          !needsDelegationFirst
+        ) {
           throw new Error(relayError)
         }
-        // EIP-7702 Stateless: smart account address is the connected EOA.
-        // 1Shot has no Sepolia payment tokens — proceed without gasless relay.
         if (predicted.toLowerCase() !== address.toLowerCase()) {
           throw new Error(
-            '1Shot unavailable and smart account address differs from wallet. Cannot deploy on Sepolia.',
+            needsDelegationFirst
+              ? 'Complete permissions (step 3) before gasless deploy, or use a wallet whose smart account matches your EOA.'
+              : '1Shot unavailable and smart account address differs from wallet. Cannot deploy on Sepolia.',
           )
         }
       }
 
-      const store = useActivationStore.getState()
-      store.setOneShotTaskId(taskId)
-      if (txHash) store.setDeployTxHash(txHash)
+      patch({ oneShotTaskId: taskId, deployTxHash: txHash, phase: 'idle' })
       markComplete('deploy')
-      store.setPhase('idle')
       setActivationStep(2)
     } catch (e) {
-      useActivationStore.getState().setPhase('error')
+      patch({ phase: 'error' })
       setError(e instanceof Error ? e.message : 'Deploy failed')
     }
-  }, [address, ensureForgeNetwork, loadPredictedAddress, markComplete, setActivationStep])
+  }, [address, ensureForgeNetwork, loadPredictedAddress, markComplete, patch, setActivationStep])
 
+  // ─── Step 3: Sign root delegation (ERC-7715) ───────────────────────────
   const requestPermissions = useCallback(async () => {
     setError(null)
-    useActivationStore.getState().setPhase('requesting_permissions')
+    patch({ phase: 'requesting_permissions' })
     try {
       if (!address) throw new Error('Connect wallet first')
       if (chainId !== ACTIVATION_CHAIN_ID) {
@@ -306,11 +381,17 @@ export function useActivation() {
         transport: custom(provider),
       }).extend(erc7715ProviderActions())
 
-      const permissions = buildActivationPermissions(CONTRACTS.osKernel)
-      const granted = await erc7715Client.requestExecutionPermissions(permissions)
+      const relayTarget = await getRelayTargetAddress(ACTIVATION_CHAIN_ID)
+      const permissions = buildActivationPermissions(relayTarget)
+      const granted = await withErc7715Lock(() =>
+        erc7715Client.requestExecutionPermissions(permissions),
+      )
 
       const delegator = (smartAccountAddress ?? address) as Address
-      const kitDel = await createRootDelegationStruct({ delegator })
+      const kitDel = await createRootDelegationStruct({
+        delegator,
+        delegate: relayTarget,
+      })
       const signature = granted[0]?.context as `0x${string}` | undefined
       if (!signature || signature === '0x') {
         throw new Error(
@@ -328,6 +409,7 @@ export function useActivation() {
         body: JSON.stringify({
           chainId: ACTIVATION_CHAIN_ID,
           delegationHash: forgeDel.hash,
+          signedDelegation: forgeDel,
         }),
       })
       const delegateData = (await delegateRes.json()) as { taskId?: string; error?: string }
@@ -336,17 +418,17 @@ export function useActivation() {
         if (!isOneShotUnavailableError(relayError)) {
           throw new Error(relayError)
         }
-      } else {
-        useActivationStore.getState().setOneShotTaskId(delegateData.taskId ?? null)
       }
 
+      patch({
+        delegationHash: forgeDel.hash,
+        oneShotTaskId: delegateData.taskId ?? null,
+        phase: 'idle',
+      })
       markComplete('permissions')
-      const store = useActivationStore.getState()
-      store.setPhase('idle')
-      store.setDelegationHash(forgeDel.hash)
       setActivationStep(3)
     } catch (e) {
-      useActivationStore.getState().setPhase('error')
+      patch({ phase: 'error' })
       if (process.env.NODE_ENV === 'development') {
         console.error('[ForgeOS] ERC-7715 request failed', e)
       }
@@ -357,12 +439,14 @@ export function useActivation() {
     chainId,
     smartAccountAddress,
     markComplete,
+    patch,
     setRootDelegation,
     setDelegations,
     setActivationStep,
     switchChainAsync,
   ])
 
+  // ─── Step 4: Fund treasury ──────────────────────────────────────────────
   const finishActivation = useCallback(
     (tx?: Hash) => {
       const kernel: OSKernelConfig = {
@@ -378,17 +462,15 @@ export function useActivation() {
       setKernel(kernel)
       setOsStatus('active')
       markComplete('fund')
-      const store = useActivationStore.getState()
-      store.setPhase('active')
-      if (tx) store.setFundTxHash(tx)
+      patch({ phase: 'active', fundTxHash: tx ?? null })
       setActivationStep(4)
     },
-    [deployTxHash, markComplete, setKernel, setOsStatus, setActivationStep],
+    [deployTxHash, markComplete, patch, setKernel, setOsStatus, setActivationStep],
   )
 
   const fundTreasury = useCallback(async () => {
     setError(null)
-    useActivationStore.getState().setPhase('funding')
+    patch({ phase: 'funding' })
     fundAbortRef.current?.abort()
     const abort = new AbortController()
     fundAbortRef.current = abort
@@ -489,68 +571,66 @@ export function useActivation() {
       finishActivation(fundHash)
     } catch (e) {
       if (abort.signal.aborted) {
-        useActivationStore.getState().setPhase('idle')
+        patch({ phase: 'idle' })
         return
       }
       const message = e instanceof Error ? e.message : String(e)
       if (/user denied transaction signature/i.test(message)) {
-        useActivationStore.getState().setPhase('error')
+        patch({ phase: 'error' })
         setError(
           'Funding needs 2 MetaMask confirmations (approve + fund). The second fund signature was rejected, so no treasury deposit was sent.',
         )
         return
       }
       if (/Wallet network is \d+/.test(message)) {
-        useActivationStore.getState().setPhase('idle')
+        patch({ phase: 'idle' })
         setError(message)
         return
       }
       if (/AgentTreasury expects USDC|Treasury accepts USDC|Treasury funding would fail/i.test(message)) {
-        useActivationStore.getState().setPhase('idle')
+        patch({ phase: 'idle' })
         setError(message)
         return
       }
-      useActivationStore.getState().setPhase('error')
+      patch({ phase: 'error' })
       setError(e instanceof Error ? e.message : 'Treasury funding failed')
     } finally {
       if (fundAbortRef.current === abort) {
         fundAbortRef.current = null
       }
     }
-  }, [address, chainId, connectedWalletClient, fundAmountUsdc, finishActivation, switchChainAsync])
+  }, [address, chainId, connectedWalletClient, fundAmountUsdc, finishActivation, patch, switchChainAsync])
 
   const cancelFunding = useCallback(() => {
     fundAbortRef.current?.abort()
-    useActivationStore.getState().setPhase('idle')
+    patch({ phase: 'idle' })
     setError(null)
-  }, [])
+  }, [patch])
 
+  // ─── Reset entire activation for the current wallet ─────────────────────
   const resetActivation = useCallback(() => {
-    useActivationStore.getState().reset()
+    if (address) useActivationStore.getState().resetWallet(address)
+    setConnectPhase('idle')
     setError(null)
     setOsStatus('inactive')
     setRootDelegation(null)
     setKernel(null)
     setActivationStep(0)
     disconnect()
-  }, [disconnect, setKernel, setOsStatus, setRootDelegation, setActivationStep])
+  }, [address, disconnect, setKernel, setOsStatus, setRootDelegation, setActivationStep])
 
-  // If wallet definitively disconnects mid-flow, reset back to connect step so the
-  // user can reconnect. We use walletStatus === 'disconnected' (not 'reconnecting')
-  // to avoid wiping state during wagmi's automatic reconnection on page load.
+  // ─── Wallet disconnected mid-flow ────────────────────────────────────────
+  // Preserve the wallet's stored progress — if they reconnect with the same
+  // wallet, they resume where they left off. Only reset transient local state.
   useEffect(() => {
     if (walletStatus !== 'disconnected') return
-    const { phase: currentPhase, completedSteps: currentSteps } = useActivationStore.getState()
-    if (currentSteps.includes('connect')) {
-      useActivationStore.getState().setCompletedSteps([])
-    }
-    if (currentPhase !== 'active' && currentPhase !== 'connecting') {
-      useActivationStore.getState().setPhase('idle')
-    }
+    setConnectPhase('idle')
     setError(null)
   }, [walletStatus])
 
+  // ─── Go back one step ───────────────────────────────────────────────────
   const goBack = useCallback(() => {
+    if (!address) return
     const flow: ActivationStepId[] = ['connect', 'deploy', 'permissions', 'fund']
     const currentIdx = flow.indexOf(
       currentStep as Exclude<ActivationStepId, 'complete'>,
@@ -559,16 +639,17 @@ export function useActivation() {
     setError(null)
     const prevStep = flow[currentIdx - 1]
     const prevIdx = flow.indexOf(prevStep)
-    const { completedSteps: current } = useActivationStore.getState()
-    useActivationStore.getState().setCompletedSteps(
-      current.filter((s) => {
+    const current = useActivationStore.getState().getWallet(address).completedSteps
+    useActivationStore.getState().patchWallet(address, {
+      completedSteps: current.filter((s) => {
         const idx = flow.indexOf(s as Exclude<ActivationStepId, 'complete'>)
         return idx < prevIdx
       }),
-    )
-    useActivationStore.getState().setPhase('idle')
-  }, [currentStep])
+      phase: 'idle',
+    })
+  }, [address, currentStep])
 
+  // ─── Can this step proceed? ─────────────────────────────────────────────
   const canProceed = useCallback(
     (step: ActivationStepId) => {
       if (step === 'connect') return isConnected
@@ -581,7 +662,7 @@ export function useActivation() {
   )
 
   return {
-    phase,
+    phase: derivedPhase,
     error,
     steps,
     progressPercent,

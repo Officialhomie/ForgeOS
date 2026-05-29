@@ -11,9 +11,9 @@ dataSources:
     name: OSKernel
     network: sepolia
     source:
-      address: "0xcFC6BECB0054D6e313a88c70CcE1d477D8752382"
+      address: "0xa4bD3e0946431dFA0C38F700f5935E03b749C77C"
       abi: OSKernel
-      startBlock: 10934090
+      startBlock: 10945007
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -40,9 +40,9 @@ dataSources:
     name: AgentTreasury
     network: sepolia
     source:
-      address: "0xe0DD408BE8cb3Dfe6441FEfE1e209E886F48071A"
+      address: "0x95B93bF1Ed959dfb1BBEC6Af023A3263740BC429"
       abi: AgentTreasury
-      startBlock: 10934090
+      startBlock: 10945007
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -57,8 +57,10 @@ dataSources:
       eventHandlers:
         - event: "TreasuryFunded(indexed address,uint256)"
           handler: handleTreasuryFunded
-        - event: "PaymentExecuted(indexed address,uint256,indexed bytes32)"
+        - event: "PaymentExecuted(indexed address,uint256,indexed bytes32,indexed address)"
           handler: handlePaymentExecuted
+        - event: "TreasuryWithdrawn(indexed address,uint256)"
+          handler: handleTreasuryWithdrawn
         - event: "RevenueDistributed(uint256,uint256,uint256)"
           handler: handleRevenueDistributed
         - event: "AgentBudgetSet(indexed bytes32,uint256)"
@@ -70,9 +72,9 @@ dataSources:
     name: ForgeOSRegistry
     network: sepolia
     source:
-      address: "0x4668B4Dd600FB4404783a9C73B6b4fcb71e78347"
+      address: "0xDE52F54c88510F9eC584f514CEAB4b965bbf2A68"
       abi: ForgeOSRegistry
-      startBlock: 10934090
+      startBlock: 10945007
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7

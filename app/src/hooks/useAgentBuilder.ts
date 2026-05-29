@@ -3,10 +3,27 @@
 import { useState, useCallback } from 'react'
 import { AGENT_TEMPLATES } from '@/lib/agents/templates'
 import type { AgentTemplate } from '@/lib/agents/templates'
+import { savePendingAgentToStorage } from '@/lib/registry/pending-storage'
 import type { AgentId, Hash } from '@/types'
 import { buildActivationPermissions } from '@/lib/delegation/buildPermissions'
-import { CONTRACTS } from '@/lib/contracts'
+import { rootDelegationNeedsRelayResign } from '@/lib/delegation/needs-relay-resign'
+import { getRelayTargetAddress } from '@/lib/oneshot/client'
+import { isErc7715Busy, withErc7715Lock } from '@/lib/wallet/erc7715-lock'
+import { forgeChain } from '@/lib/wagmi/chains'
+import { ensureForgeChain } from '@/lib/wagmi/ensure-forge-chain'
+import {
+  formatErc7715Error,
+  getErc7715Provider,
+  getEthereumProviderDiagnostics,
+  probeErc7715RpcSupport,
+  refreshWalletRuntimeCache,
+} from '@/lib/wagmi/ethereum-provider'
+import { ACTIVATION_CHAIN_ID } from '@/types/activation'
+import { erc7715ProviderActions } from '@metamask/smart-accounts-kit/actions'
+import { createClient, custom } from 'viem'
+import { useAccount, useChainId, useSwitchChain } from 'wagmi'
 import { useOsStore } from '@/stores/os.store'
+import { useActivationStore } from '@/stores/activation.store'
 
 export type BuilderStep =
   | 'idle'
@@ -23,6 +40,8 @@ export interface DeployedAgent {
   delegationHash: Hash | null
   taskId: string | null
   ipfsUri: string | null
+  metadataSource?: 'pinata' | 'inline'
+  pinataError?: string | null
 }
 
 export interface UseAgentBuilderReturn {
@@ -33,6 +52,7 @@ export interface UseAgentBuilderReturn {
   spendCap: number
   intervalHours: number
   testResult: string | null
+  draftSaved: boolean
   deployedAgent: DeployedAgent | null
   error: string | null
   selectTemplate: (id: AgentId) => void
@@ -56,11 +76,18 @@ export function useAgentBuilder(): UseAgentBuilderReturn {
   const [spendCap, setSpendCap] = useState(500)
   const [intervalHours, setIntervalHours] = useState(1)
   const [testResult, setTestResult] = useState<string | null>(null)
+  const [draftSaved, setDraftSaved] = useState(false)
   const [deployedAgent, setDeployedAgent] = useState<DeployedAgent | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [approvedDelegationHash, setApprovedDelegationHash] = useState<Hash | null>(null)
 
+  const { address: walletAddress } = useAccount()
+  const chainId = useChainId()
+  const { switchChainAsync } = useSwitchChain()
   const rootDelegation = useOsStore((s) => s.rootDelegation)
+  const smartAccountAddress = useActivationStore((s) =>
+    walletAddress ? s.getWallet(walletAddress).smartAccountAddress : null,
+  )
 
   const selectTemplate = useCallback((id: AgentId) => {
     const template = AGENT_TEMPLATES.find((t) => t.id === id)
@@ -78,20 +105,26 @@ export function useAgentBuilder(): UseAgentBuilderReturn {
     }
     setConfigValues(defaults)
     setStep('configuring')
+    setDraftSaved(false)
   }, [])
 
   const saveDraft = useCallback(() => {
     if (!selectedTemplate) return
-    localStorage.setItem(
-      DRAFT_KEY,
-      JSON.stringify({
+    try {
+      const payload = {
         templateId: selectedTemplate.id,
         prompt,
         spendCap,
         intervalHours,
         configValues,
-      }),
-    )
+      }
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(payload))
+      setDraftSaved(true)
+      setError(null)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      setError(msg)
+    }
   }, [selectedTemplate, prompt, spendCap, intervalHours, configValues])
 
   const loadDraft = useCallback(() => {
@@ -144,39 +177,85 @@ export function useAgentBuilder(): UseAgentBuilderReturn {
       setError('Select an agent template first')
       return
     }
+    if (isErc7715Busy()) {
+      setError('MetaMask is already processing a permission request. Finish or close that popup first.')
+      return
+    }
     setStep('approving')
     setError(null)
     try {
-      const provider = (
-        window as unknown as {
-          ethereum?: { request: (args: { method: string; params: unknown[] }) => Promise<unknown> }
-        }
-      ).ethereum
+      if (rootDelegation && !(await rootDelegationNeedsRelayResign(rootDelegation))) {
+        setApprovedDelegationHash(rootDelegation.hash)
+        setStep('configuring')
+        setError(null)
+        return
+      }
+      if (!walletAddress) throw new Error('Connect wallet first')
+      if (chainId !== ACTIVATION_CHAIN_ID) {
+        await ensureForgeChain(switchChainAsync)
+      }
+
+      await refreshWalletRuntimeCache()
+      const diag = getEthereumProviderDiagnostics()
+      if (diag.hasFlaskCandidate && diag.hasStandardMetaMaskCandidate) {
+        throw new Error(
+          'Dual MetaMask extensions detected. Disable regular MetaMask, keep only Flask, hard-refresh, reconnect.',
+        )
+      }
+      if (diag.kind === 'metamask' && !diag.hasFlaskCandidate) {
+        throw new Error(
+          'Connected to standard MetaMask, not Flask. Disable standard MetaMask and reconnect with Flask only.',
+        )
+      }
+
+      const provider = await getErc7715Provider()
       if (!provider) throw new Error('MetaMask not found')
 
-      const permissions = buildActivationPermissions(CONTRACTS.osKernel, {
+      const rpcOk = await probeErc7715RpcSupport(provider)
+      if (!rpcOk) {
+        throw new Error(
+          'wallet_getSupportedExecutionPermissions is not available on this MetaMask Flask build. Install a Flask version with ERC-7715 enabled.',
+        )
+      }
+
+      const relayTarget = await getRelayTargetAddress(ACTIVATION_CHAIN_ID)
+      const permissions = buildActivationPermissions(relayTarget, {
         monthlyCapUsdc: spendCap,
       })
 
-      const granted = (await provider.request({
-        method: 'wallet_requestExecutionPermissions',
-        params: permissions,
-      })) as Array<{ context?: string }>
+      const erc7715Client = createClient({
+        chain: forgeChain,
+        transport: custom(provider),
+      }).extend(erc7715ProviderActions())
+
+      const granted = await withErc7715Lock(() =>
+        erc7715Client.requestExecutionPermissions(permissions),
+      )
 
       const sig = granted[0]?.context as Hash | undefined
-      if (!sig) throw new Error('No delegation signature returned')
+      if (!sig || sig === '0x') {
+        throw new Error(
+          'MetaMask did not return a delegation signature. Approve the permission request and retry.',
+        )
+      }
       setApprovedDelegationHash(sig)
       setStep('configuring')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Approval failed')
+      setError(formatErc7715Error(e))
       setStep('configuring')
     }
-  }, [selectedTemplate, spendCap])
+  }, [selectedTemplate, spendCap, walletAddress, chainId, switchChainAsync, rootDelegation])
 
   const deployAgent = useCallback(async () => {
     if (!selectedTemplate) return
-    if (!approvedDelegationHash && !rootDelegation) {
-      setError('Approve agent permissions in your wallet before publishing')
+    if (!rootDelegation) {
+      setError(
+        'Finish OS activation first (/activate → Permissions). Your root delegation is required to publish on-chain.',
+      )
+      return
+    }
+    if (!smartAccountAddress) {
+      setError('Deploy your Forge smart account in activation before publishing.')
       return
     }
 
@@ -200,23 +279,48 @@ export function useAgentBuilder(): UseAgentBuilderReturn {
             },
           })),
           agentAddress:
-            process.env.NEXT_PUBLIC_DEFI_AGENT_ADDRESS ??
-            '0x0000000000000000000000000000000000000000',
+            process.env.NEXT_PUBLIC_DEFI_AGENT_ADDRESS ?? smartAccountAddress,
+          smartAccountAddress,
+          signedDelegations: [rootDelegation],
           configSchema: selectedTemplate.configSchema,
         }),
       })
 
       const data = (await res.json()) as
-        | { success: true; agentId: string; ipfsUri: string; taskId: string }
+        | {
+            success: true
+            agentId: string
+            ipfsUri: string
+            taskId: string
+            metadataSource?: 'pinata' | 'inline'
+            pinataError?: string | null
+          }
         | { success: false; error: string }
 
-      if (!data.success) throw new Error(data.error)
+      if (!res.ok || !data.success) {
+        throw new Error('error' in data ? data.error : `Publish failed (${res.status})`)
+      }
 
       setDeployedAgent({
         agentId: data.agentId,
         delegationHash: approvedDelegationHash,
         taskId: data.taskId,
         ipfsUri: data.ipfsUri,
+        metadataSource: data.metadataSource,
+        pinataError: data.pinataError ?? null,
+      })
+      savePendingAgentToStorage({
+        agentId: data.agentId as `0x${string}`,
+        creator: smartAccountAddress as `0x${string}`,
+        name: selectedTemplate.name,
+        metadataUri: data.ipfsUri,
+        metadata: {
+          description: selectedTemplate.description,
+          category: selectedTemplate.category,
+          promptTemplate: prompt,
+        },
+        taskId: data.taskId,
+        publishedAt: Date.now(),
       })
       setStep('deployed')
       localStorage.removeItem(DRAFT_KEY)
@@ -224,7 +328,14 @@ export function useAgentBuilder(): UseAgentBuilderReturn {
       setError(e instanceof Error ? e.message : 'Publish failed')
       setStep('configuring')
     }
-  }, [selectedTemplate, prompt, spendCap, approvedDelegationHash, rootDelegation])
+  }, [
+    selectedTemplate,
+    prompt,
+    spendCap,
+    approvedDelegationHash,
+    rootDelegation,
+    smartAccountAddress,
+  ])
 
   const reset = useCallback(() => {
     setStep('idle')
@@ -247,6 +358,7 @@ export function useAgentBuilder(): UseAgentBuilderReturn {
     spendCap,
     intervalHours,
     testResult,
+    draftSaved,
     deployedAgent,
     error,
     selectTemplate,

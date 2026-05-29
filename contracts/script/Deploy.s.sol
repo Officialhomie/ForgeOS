@@ -13,12 +13,11 @@ contract Deploy is Script {
     function run() external {
         address usdc = vm.envAddress("USDC_ADDRESS");
 
-        // Use vm.startBroadcast() with no args so Foundry picks up the
-        // --account <keystore> flag passed on the CLI. msg.sender inside
-        // the broadcast block equals the keystore account address.
         vm.startBroadcast();
 
-        address deployer = msg.sender;
+        // msg.sender in Script context is Foundry DefaultSender, not --account.
+        address deployer =
+            vm.envOr("DEPLOYER_ADDRESS", DEFAULT_PLATFORM_FEE_RECIPIENT);
         address platform =
             vm.envOr("PLATFORM_FEE_RECIPIENT", DEFAULT_PLATFORM_FEE_RECIPIENT);
 

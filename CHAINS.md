@@ -8,18 +8,18 @@ Default for the app, ERC-7715 Flask, and 1Shot relay.
 |------------------|--------------------|-----------|
 | Contracts deploy | Ethereum Sepolia   | `11155111` |
 | Wallet / wagmi   | Ethereum Sepolia   | `11155111` |
-| 1Shot relay      | Ethereum Sepolia   | `11155111` |
+| 1Shot relay      | Ethereum Sepolia   | `11155111` → `https://relayer.1shotapi.dev/relayers` |
 | USDC (test)      | Ethereum Sepolia   | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` |
 
 ## Deployed contracts (Ethereum Sepolia) — **use these in app**
 
 | Contract | Address | Etherscan |
 |----------|---------|-----------|
-| ForgeOSRegistry | `0x4668B4Dd600FB4404783a9C73B6b4fcb71e78347` | [view](https://sepolia.etherscan.io/address/0x4668B4Dd600FB4404783a9C73B6b4fcb71e78347) |
-| OSKernel | `0xcFC6BECB0054D6e313a88c70CcE1d477D8752382` | [view](https://sepolia.etherscan.io/address/0xcFC6BECB0054D6e313a88c70CcE1d477D8752382) |
-| AgentTreasury | `0xe0DD408BE8cb3Dfe6441FEfE1e209E886F48071A` | [view](https://sepolia.etherscan.io/address/0xe0DD408BE8cb3Dfe6441FEfE1e209E886F48071A) |
+| ForgeOSRegistry | `0xDE52F54c88510F9eC584f514CEAB4b965bbf2A68` | [view](https://sepolia.etherscan.io/address/0xDE52F54c88510F9eC584f514CEAB4b965bbf2A68) |
+| OSKernel | `0xa4bD3e0946431dFA0C38F700f5935E03b749C77C` | [view](https://sepolia.etherscan.io/address/0xa4bD3e0946431dFA0C38F700f5935E03b749C77C) |
+| AgentTreasury | `0x95B93bF1Ed959dfb1BBEC6Af023A3263740BC429` | [view](https://sepolia.etherscan.io/address/0x95B93bF1Ed959dfb1BBEC6Af023A3263740BC429) |
 
-Deploy cost: **~0.00419 ETH** total (block 10934090).
+Deploy cost: **~0.01695 ETH** total (block 10945007).
 
 **Note:** `OSKernel.owner()` was set to Foundry’s `DefaultSender` (`0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38`) in simulation; on-chain owner may differ from deployer `0x9aC2d5…` — check Etherscan before owner-only actions.
 
@@ -68,6 +68,15 @@ forge script script/Deploy.s.sol \
 | Venice x402 | Base mainnet | `8453` |
 
 Set `VENICE_CHAIN_ID=8453` (default).
+
+## 1Shot relayer URLs
+
+| Environment | `ONESHOT_RELAYER_URL` |
+|-------------|------------------------|
+| Sepolia / Base Sepolia (dev) | `https://relayer.1shotapi.dev/relayers` |
+| Mainnet (production) | `https://relayer.1shotapi.com/relayers` |
+
+ForgeOS defaults to **`.dev`** when `ONESHOT_CHAIN_ID` is `11155111` or `84532`. Override with `ONESHOT_RELAYER_URL` in `.env.local` / Vercel.
 
 ## Deployer wallet
 

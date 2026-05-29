@@ -6,7 +6,8 @@ import type { Address } from '@/types'
 const MONTH_SECONDS = 30 * 24 * 60 * 60
 
 export function buildActivationPermissions(
-  kernelAddress: Address = CONTRACTS.osKernel,
+  /** ERC-7715 permission target — must match 1Shot relayer `targetAddress`, not OSKernel. */
+  permissionTarget: Address,
   options?: {
     monthlyCapUsdc?: number
     usdcAddress?: Address
@@ -14,12 +15,13 @@ export function buildActivationPermissions(
 ): PermissionRequestParameter[] {
   const monthlyCap = options?.monthlyCapUsdc ?? 500
   const tokenAddress = options?.usdcAddress ?? CONTRACTS.usdc
-  const periodAmount = BigInt(monthlyCap) * 1_000_000n
+  // MetaMask RPC cannot serialize BigInt in permission params.
+  const periodAmount = monthlyCap * 1_000_000
 
   return [
     {
       chainId: ACTIVATION_CHAIN_ID,
-      to: kernelAddress,
+      to: permissionTarget,
       permission: {
         type: 'erc20-token-periodic',
         isAdjustmentAllowed: false,

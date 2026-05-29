@@ -734,9 +734,9 @@ export const APP_URL =
 ```ts
 // lib/contracts.ts (derive from CHAINS.md)
 export const CONTRACTS = {
-  osKernel: '0xcFC6BECB0054D6e313a88c70CcE1d477D8752382',
-  agentTreasury: '0xe0DD408BE8cb3Dfe6441FEfE1e209E886F48071A',
-  registry: '0x4668B4Dd600FB4404783a9C73B6b4fcb71e78347',
+  osKernel: '0xa4bD3e0946431dFA0C38F700f5935E03b749C77C',
+  agentTreasury: '0x95B93bF1Ed959dfb1BBEC6Af023A3263740BC429',
+  registry: '0xDE52F54c88510F9eC584f514CEAB4b965bbf2A68',
   usdcSepolia: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
   usdcBase: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
 } as const

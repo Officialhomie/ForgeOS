@@ -47,7 +47,7 @@ export async function POST(request: Request) {
           target: kernelAddress,
           value: '0',
           nonce: 0,
-          delegationHash: delegation.hash,
+          delegationProofs: [delegation],
         },
       ],
       destinationUrl: webhookUrl,

@@ -68,7 +68,8 @@ export async function POST(request: Request) {
     )
   }
 
-  if (isBalanceCheckIntent(intent)) {
+  const balanceIntent = isBalanceCheckIntent(intent)
+  if (balanceIntent) {
     try {
       const snapshot = await getAgentFundingSnapshot()
       const summary = formatFundingSnapshot(snapshot)

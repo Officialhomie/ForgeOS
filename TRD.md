@@ -99,18 +99,18 @@ This document specifies all 12 core operational flows of ForgeOS. Each flow maps
 **Precondition:** `ONESHOT_API_KEY` configured, chain 11155111.
 
 **Step 1 — Get Capabilities**
-- `relayer_getCapabilities({ chainId: 11155111 })`
-- Returns: `{ acceptedTokens, feeCollector, targetAddress, chainId }`
-- Payment token selected from `acceptedTokens` (never hardcoded)
+- `relayer_getCapabilities(["11155111"])` on `https://relayer.1shotapi.dev/relayers`
+- Returns: `{ "11155111": { tokens, feeCollector, targetAddress } }`
+- Payment token from `tokens[0]` (never hardcoded)
 
 **Step 2 — Get Fee Data**
-- `relayer_getFeeData({ chainId: 11155111, token: acceptedTokens[0] })`
-- Returns: `{ gasPrice, rate, minFee, convertedFee, expiry, context }`
+- `relayer_getFeeData({ chainId: "11155111", token })`
+- Returns: `{ gasPrice, rate, minFee, expiry, context }`
 - `context` string passed back in send call (required)
 
 **Step 3 — Send Transaction**
-- `relayer_send7710Transaction({ chainId, userOps, destinationUrl, feeContext })`
-- `userOps` array: each op has `{ sender, callData, target, value, nonce, delegationChain, delegationProofs }`
+- `relayer_send7710Transaction({ chainId, transactions, context, destinationUrl })`
+- Each transaction: `{ permissionContext, executions }` (fee USDC transfer + work call)
 - `destinationUrl` = `${APP_URL}/api/webhooks/1shot` (required for webhook score)
 - Returns `{ taskId }` immediately
 
@@ -489,9 +489,9 @@ function encodeDelegationStruct(d: Delegation): Hex {
 
 | Contract | Address | Etherscan |
 |----------|---------|-----------|
-| OSKernel | `0xcFC6BECB0054D6e313a88c70CcE1d477D8752382` | [view](https://sepolia.etherscan.io/address/0xcFC6BECB0054D6e313a88c70CcE1d477D8752382) |
-| AgentTreasury | `0xe0DD408BE8cb3Dfe6441FEfE1e209E886F48071A` | [view](https://sepolia.etherscan.io/address/0xe0DD408BE8cb3Dfe6441FEfE1e209E886F48071A) |
-| ForgeOSRegistry | `0x4668B4Dd600FB4404783a9C73B6b4fcb71e78347` | [view](https://sepolia.etherscan.io/address/0x4668B4Dd600FB4404783a9C73B6b4fcb71e78347) |
+| OSKernel | `0xa4bD3e0946431dFA0C38F700f5935E03b749C77C` | [view](https://sepolia.etherscan.io/address/0xa4bD3e0946431dFA0C38F700f5935E03b749C77C) |
+| AgentTreasury | `0x95B93bF1Ed959dfb1BBEC6Af023A3263740BC429` | [view](https://sepolia.etherscan.io/address/0x95B93bF1Ed959dfb1BBEC6Af023A3263740BC429) |
+| ForgeOSRegistry | `0xDE52F54c88510F9eC584f514CEAB4b965bbf2A68` | [view](https://sepolia.etherscan.io/address/0xDE52F54c88510F9eC584f514CEAB4b965bbf2A68) |
 | USDC (Sepolia) | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` | |
 
 ### Deployed Contracts (Base Sepolia — alternate)
@@ -572,7 +572,7 @@ function encodeDelegationStruct(d: Delegation): Hex {
 | Variable | Required | Description | Example |
 |----------|----------|-------------|---------|
 | `ONESHOT_API_KEY` | Yes | 1Shot relayer API key | `1shot_xxxxx` |
-| `ONESHOT_RELAYER_URL` | No | 1Shot relayer endpoint | `https://relayer.1shotapi.com/relayers` |
+| `ONESHOT_RELAYER_URL` | No | 1Shot relayer endpoint (Sepolia: `.dev`; mainnet: `.com`) | `https://relayer.1shotapi.dev/relayers` |
 | `ONESHOT_CHAIN_ID` | No | Target chain (default: 11155111) | `11155111` |
 | `ONESHOT_WEBHOOK_URL` | No | Override webhook destination | `https://your-domain.com/api/webhooks/1shot` |
 | `ONESHOT_WEBHOOK_SECRET` | Yes | Ed25519 public key for webhook verification | `0x...` |

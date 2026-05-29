@@ -770,9 +770,13 @@ export async function getAgentFundingSnapshot(): Promise<AgentFundingSnapshot> {
 }
 
 export function isBalanceCheckIntent(intent: string): boolean {
-  const t = intent.toLowerCase()
+  const t = intent.toLowerCase().trim()
+  // Agent system prompts mention USDC and "check if …" — not wallet balance queries.
+  if (t.startsWith('you are a ') || t.startsWith('you are an ')) return false
+  if (t.length > 200) return false
+  if (/\bcheck\s+if\b/.test(t)) return false
   return (
-    /\b(balance|funds|usdc)\b/.test(t) &&
+    /\b(balance|funds|usdc|wallet)\b/.test(t) &&
     /\b(check|show|what|how much|read|view|my)\b/.test(t)
   )
 }

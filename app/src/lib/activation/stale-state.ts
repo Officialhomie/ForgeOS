@@ -19,7 +19,13 @@ interface StaleCheckInput {
   oneShotTaskId?: string | null
 }
 
-/** Demo / optimistic activation that never confirmed real treasury funding. */
+/**
+ * Returns true if a stored wallet activation state should be discarded.
+ *
+ * Wallet address mismatch is no longer a concern here — the activation store
+ * is keyed per wallet address, so each wallet only ever reads its own slice.
+ * This check only handles demo/mock states that were never confirmed on-chain.
+ */
 export function isStaleActivationState(state: StaleCheckInput | null): boolean {
   if (!state) return false
   if (state.oneShotTaskId?.startsWith('demo-')) return true

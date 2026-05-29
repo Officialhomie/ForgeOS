@@ -83,9 +83,19 @@ export function StepThree_Delegate() {
           </div>
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-forge-text-muted">Managed by</dt>
+              <dt className="text-forge-text-muted">Relay target</dt>
+              <dd className="flex flex-col items-end gap-0.5 text-right">
+                <span className="text-xs font-medium text-forge-orange">
+                  MetaMask smart account
+                </span>
+                <span className="text-xs text-forge-text-subtle">
+                  Required by 1Shot gasless relay (not OSKernel)
+                </span>
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-forge-text-muted">OS kernel</dt>
               <dd className="flex flex-col items-end gap-0.5">
-                <span className="text-xs font-medium text-forge-orange">ForgeOS</span>
                 <AddressDisplay address={CONTRACTS.osKernel} />
               </dd>
             </div>

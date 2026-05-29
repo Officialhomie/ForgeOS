@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMarketplace } from '@/hooks/useMarketplace'
+import { recoverPendingFromIpfsUri } from '@/lib/registry/pending-storage'
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
@@ -55,7 +56,14 @@ function AgentCard({
       <div className="flex flex-col gap-3 rounded-xl border border-forge-border bg-forge-surface p-5 transition-colors hover:border-orange-500/40 h-full">
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-semibold text-forge-text leading-tight">{agent.name}</h3>
-          <CategoryBadge category={category} />
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            {agent.pending && (
+              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+                Confirming on-chain
+              </span>
+            )}
+            <CategoryBadge category={category} />
+          </div>
         </div>
 
         <p className="text-sm leading-relaxed text-forge-text-muted line-clamp-3">{description}</p>
@@ -81,6 +89,21 @@ function AgentCard({
 export default function MarketplacePage() {
   const { agents, loading, error, refetch } = useMarketplace()
   const [activeCategory, setActiveCategory] = useState<Category>('all')
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const recover = params.get('recoverIpfs')
+    if (!recover) return
+    const recoverAgentId = params.get('recoverAgentId') as `0x${string}` | null
+    void recoverPendingFromIpfsUri(recover, {
+      agentId: recoverAgentId ?? undefined,
+    }).then(() => {
+      void refetch()
+      params.delete('recoverIpfs')
+      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`
+      window.history.replaceState({}, '', next)
+    })
+  }, [refetch])
 
   const filtered = activeCategory === 'all'
     ? agents

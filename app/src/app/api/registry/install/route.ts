@@ -14,7 +14,8 @@ import { NextResponse } from 'next/server'
 import { createPublicClient, http } from 'viem'
 import { sepolia } from 'viem/chains'
 import type { Address } from '@/types'
-import { fetchRegistryLogs, resolveFromBlock } from '@/lib/registry/registry-logs'
+import { resolveRegistryMetadata } from '@/lib/registry/metadata'
+import { fetchRegistryLogs, readAgentEndpoint, resolveFromBlock } from '@/lib/registry/registry-logs'
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 
@@ -26,26 +27,6 @@ interface InstallRequest {
   agentId: `0x${string}`
   userAddress: Address
   parentDelegationHash: `0x${string}`
-}
-
-// ─── IPFS RESOLUTION ─────────────────────────────────────────────────────────
-
-async function resolveMetadataUri(uri: string): Promise<Record<string, unknown> | null> {
-  try {
-    if (uri.startsWith('data:application/json;base64,')) {
-      const b64 = uri.replace('data:application/json;base64,', '')
-      return JSON.parse(Buffer.from(b64, 'base64').toString('utf-8')) as Record<string, unknown>
-    }
-    if (uri.startsWith('ipfs://')) {
-      const cid = uri.replace('ipfs://', '')
-      const res = await fetch(`https://ipfs.io/ipfs/${cid}`, { signal: AbortSignal.timeout(5000) })
-      if (!res.ok) return null
-      return (await res.json()) as Record<string, unknown>
-    }
-  } catch {
-    // noop
-  }
-  return null
 }
 
 // ─── HANDLER ──────────────────────────────────────────────────────────────────
@@ -93,14 +74,13 @@ export async function POST(request: Request) {
     }
 
     const log = logs[0]
-    const { metadataUri, creator } = log.args as {
-      metadataUri: string
-      creator: `0x${string}`
-    }
+    const { owner } = log.args as { owner: `0x${string}` }
 
-    // Resolve metadata to get caveat template
-    const metadata = metadataUri ? await resolveMetadataUri(metadataUri) : null
-    const agentAddress = (metadata?.agentAddress as string | undefined) ?? creator
+    const metadataUri = (await readAgentEndpoint(client, agentId)) ?? ''
+    const metadata = metadataUri
+      ? ((await resolveRegistryMetadata(metadataUri)) as Record<string, unknown> | null)
+      : null
+    const agentAddress = (metadata?.agentAddress as string | undefined) ?? owner
     const caveatTemplate = metadata?.caveatTemplate ?? {}
 
     // Return ERC-7715 permission request parameters for the client to submit to MetaMask

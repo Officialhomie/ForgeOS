@@ -17,7 +17,8 @@ contract DeployTreasury is Script {
 
         vm.startBroadcast();
 
-        address deployer = msg.sender;
+        address deployer =
+            vm.envOr("DEPLOYER_ADDRESS", DEFAULT_PLATFORM_FEE_RECIPIENT);
         AgentTreasury treasury = new AgentTreasury(usdc, kernel, platform, deployer);
 
         vm.stopBroadcast();

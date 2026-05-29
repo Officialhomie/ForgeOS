@@ -20,6 +20,10 @@ import {
   createRootDelegationStruct,
   kitDelegationToForge,
 } from '@/lib/delegation/createRootDelegation'
+import {
+  mergeApiAgentsWithLocalPending,
+  prunePendingAgentsMatching,
+} from '@/lib/registry/pending-storage'
 import type { Agent, AgentId } from '@/types'
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -39,6 +43,8 @@ export interface MarketplaceAgent {
   } | null
   blockNumber: string | null
   txHash: `0x${string}` | null
+  /** Relay not yet visible in registry scan */
+  pending?: boolean
 }
 
 export interface UseMarketplaceReturn {
@@ -59,14 +65,18 @@ export function useMarketplace(): UseMarketplaceReturn {
   const { address } = useAccount()
   const rootDelegation = useOsStore((s: { rootDelegation: import('@/types').Delegation | null }) => s.rootDelegation)
 
-  const fetchAgents = useCallback(async () => {
+  const fetchAgents = useCallback(async (forceRefresh = false) => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/registry/agents')
+      const res = await fetch(
+        forceRefresh ? '/api/registry/agents?refresh=1' : '/api/registry/agents',
+      )
       const data = (await res.json()) as { success: boolean; agents?: MarketplaceAgent[]; error?: string }
       if (!data.success) throw new Error(data.error ?? 'Failed to fetch agents')
-      setAgents(data.agents ?? [])
+      const apiAgents = data.agents ?? []
+      prunePendingAgentsMatching(apiAgents)
+      setAgents(mergeApiAgentsWithLocalPending(apiAgents))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load marketplace')
     } finally {
@@ -175,5 +185,11 @@ export function useMarketplace(): UseMarketplaceReturn {
     [address, rootDelegation],
   )
 
-  return { agents, loading, error, installAgent, refetch: fetchAgents }
+  return {
+    agents,
+    loading,
+    error,
+    installAgent,
+    refetch: () => fetchAgents(true),
+  }
 }

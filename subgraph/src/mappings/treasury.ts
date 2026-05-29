@@ -4,6 +4,7 @@ import {
   PaymentExecuted,
   RevenueDistributed,
   TreasuryFunded,
+  TreasuryWithdrawn,
 } from '../../generated/AgentTreasury/AgentTreasury'
 import { ActivityEvent, TreasuryEvent, TreasuryState } from '../../generated/schema'
 
@@ -87,6 +88,26 @@ export function handlePaymentExecuted(event: PaymentExecuted): void {
   activity.txHash = event.transaction.hash
   activity.timestamp = event.block.timestamp
   activity.save()
+}
+
+export function handleTreasuryWithdrawn(event: TreasuryWithdrawn): void {
+  const state = loadOrCreateTreasuryState(event.block.timestamp)
+  state.balance = state.balance.minus(event.params.amount)
+  state.lastUpdatedAt = event.block.timestamp
+  state.save()
+
+  const evId = event.transaction.hash.toHexString() + '-' + event.logIndex.toString()
+  const ev = new TreasuryEvent(evId)
+  ev.eventType = 'WITHDRAWN'
+  ev.amount = event.params.amount
+  ev.actor = event.params.user
+  ev.agentId = null
+  ev.txHash = event.transaction.hash
+  ev.timestamp = event.block.timestamp
+  ev.userShare = null
+  ev.refillShare = null
+  ev.platformShare = null
+  ev.save()
 }
 
 export function handleRevenueDistributed(event: RevenueDistributed): void {

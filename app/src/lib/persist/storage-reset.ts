@@ -16,6 +16,7 @@ const PERSIST_KEYS = [
   'forgeos-activation',
   'forgeos-activation-v2',
   'forgeos-delegations',
+  'forgeos-agents',
   /** Legacy activation key (pre–Zustand store) */
   'forgeos_activation_v1',
 ] as const

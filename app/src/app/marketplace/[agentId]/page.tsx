@@ -3,31 +3,60 @@
 import { use, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useMarketplace } from '@/hooks/useMarketplace'
+import { useOsStore } from '@/stores/os.store'
+import { useAgentsStore } from '@/stores/agents.store'
 import { Button } from '@/components/ui/Button'
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton'
 import { Tooltip } from '@/components/ui/Tooltip'
 import type { MarketplaceAgent } from '@/hooks/useMarketplace'
+import type { AgentId } from '@/types'
 
 // ─── RULE ROW ─────────────────────────────────────────────────────────────────
 
-function RuleRow({ enforcer, terms }: { enforcer: string; terms: unknown }) {
-  // Map enforcer contract addresses to human-readable rule names
-  const ruleLabel = enforcer.includes('ERC20TransferAmount')
-    ? 'Spending limit'
-    : enforcer.includes('AllowedMethods')
-    ? 'Allowed actions'
-    : enforcer.includes('AllowedTargets')
-    ? 'Allowed destinations'
-    : enforcer.includes('LimitedCalls')
-    ? 'Usage limit'
-    : enforcer.includes('Timestamp')
-    ? 'Time restriction'
-    : 'Safety rule'
+function ruleLabel(enforcer: string | undefined, enforcerName: string | undefined): string {
+  const s = enforcerName ?? enforcer ?? ''
+  if (s.includes('ERC20TransferAmount')) return 'Spending limit'
+  if (s.includes('AllowedMethods')) return 'Allowed actions'
+  if (s.includes('AllowedTargets')) return 'Allowed destinations'
+  if (s.includes('LimitedCalls')) return 'Usage limit'
+  if (s.includes('Timestamp')) return 'Time restriction'
+  if (s.includes('BlockNumber')) return 'Block range'
+  return 'Safety rule'
+}
+
+function formatTerms(terms: unknown, name: string | undefined): string {
+  if (!terms || typeof terms !== 'object') return ''
+  const t = terms as Record<string, unknown>
+  if ((name ?? '').includes('ERC20TransferAmount') && t.maxAmount) {
+    const usdc = Number(t.maxAmount) / 1_000_000
+    return `Up to ${usdc.toLocaleString()} USDC per action`
+  }
+  if ((name ?? '').includes('LimitedCalls') && t.limit != null) {
+    return `At most ${t.limit} action${Number(t.limit) !== 1 ? 's' : ''} per run`
+  }
+  if ((name ?? '').includes('AllowedMethods')) return 'Pre-approved function list'
+  if ((name ?? '').includes('AllowedTargets')) return 'Pre-approved contract list'
+  return JSON.stringify(terms)
+}
+
+function RuleRow({
+  enforcer,
+  enforcerName,
+  description,
+  terms,
+}: {
+  enforcer?: string
+  enforcerName?: string
+  description?: string
+  terms: unknown
+}) {
+  const label = ruleLabel(enforcer, enforcerName)
+  const detail = description ?? formatTerms(terms, enforcerName)
 
   return (
-    <div className="flex items-start justify-between gap-4 rounded-lg border border-forge-border bg-forge-bg/50 px-3 py-2">
-      <span className="text-sm font-medium text-forge-text">{ruleLabel}</span>
-      <span className="text-xs text-forge-text-muted font-mono">{JSON.stringify(terms)}</span>
+    <div className="rounded-lg border border-forge-border bg-forge-bg/50 px-3 py-2.5 space-y-0.5">
+      <span className="block text-sm font-medium text-forge-text">{label}</span>
+      {detail && <span className="block text-xs text-forge-text-muted">{detail}</span>}
     </div>
   )
 }
@@ -41,9 +70,15 @@ export default function AgentDetailPage({
 }) {
   const { agentId } = use(params)
   const { agents, loading, installAgent } = useMarketplace()
+  const rootDelegation = useOsStore((s) => s.rootDelegation)
+  const installedMarketplaceIds = useAgentsStore((s) => s.installedMarketplaceIds)
   const [agent, setAgent] = useState<MarketplaceAgent | null>(null)
   const [installing, setInstalling] = useState(false)
   const [installResult, setInstallResult] = useState<{ success: boolean; error?: string } | null>(null)
+
+  const isInstalled =
+    installResult?.success === true ||
+    installedMarketplaceIds.includes(agentId as AgentId)
 
   useEffect(() => {
     if (!loading && agents.length > 0) {
@@ -86,7 +121,7 @@ export default function AgentDetailPage({
   const description = agent.metadata?.description ?? 'No description available.'
   const caveatTemplate = agent.metadata?.caveatTemplate
   const rules = Array.isArray(caveatTemplate)
-    ? (caveatTemplate as Array<{ enforcer: string; terms: unknown }>)
+    ? (caveatTemplate as Array<{ enforcer?: string; enforcerName?: string; description?: string; defaultTerms?: unknown; terms?: unknown }>)
     : []
 
   return (
@@ -159,7 +194,13 @@ export default function AgentDetailPage({
           </p>
           <div className="space-y-2">
             {rules.map((r, i) => (
-              <RuleRow key={i} enforcer={r.enforcer} terms={r.terms} />
+              <RuleRow
+                key={i}
+                enforcer={r.enforcer}
+                enforcerName={r.enforcerName}
+                description={r.description}
+                terms={r.defaultTerms ?? r.terms}
+              />
             ))}
           </div>
         </div>
@@ -189,31 +230,41 @@ export default function AgentDetailPage({
             />
           </span>
           <p className="mt-1 text-sm text-forge-text-muted">
-            Your wallet will ask you to approve this agent. Once approved, it can only do exactly
-            what is listed in the rules above — nothing more, nothing less.
+            {rootDelegation?.hash
+              ? 'Uses your existing Forge OS permissions from activation — no second wallet popup in most cases.'
+              : 'Your MetaMask Flask wallet will open to approve this agent. It can only do what is listed in the rules above.'}
           </p>
         </div>
 
-        {installResult && (
-          <div
-            className={`rounded-lg border px-4 py-3 text-sm ${
-              installResult.success
-                ? 'border-green-500/20 bg-green-500/10 text-green-400'
-                : 'border-red-500/20 bg-red-500/10 text-red-400'
-            }`}
-          >
-            {installResult.success ? 'Agent added to your account.' : installResult.error}
+        {installResult?.success === false && (
+          <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+            {installResult.error}
           </div>
         )}
 
-        {!installResult?.success && (
+        {isInstalled ? (
+          <div className="space-y-3">
+            <div className="rounded-lg border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-400">
+              This agent is on your account.
+            </div>
+            <Link href="/dashboard/agents">
+              <Button variant="secondary" className="w-full">
+                View in dashboard
+              </Button>
+            </Link>
+          </div>
+        ) : (
           <Button
             variant="default"
             className="w-full"
             onClick={() => void handleInstall()}
             disabled={installing}
           >
-            {installing ? 'Waiting for your approval...' : 'Add to my account'}
+            {installing
+              ? rootDelegation?.hash
+                ? 'Adding to your account…'
+                : 'Waiting for MetaMask Flask…'
+              : 'Add to my account'}
           </Button>
         )}
       </div>

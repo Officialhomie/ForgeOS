@@ -261,10 +261,14 @@ export function getCachedAgents<T>(): T[] | null {
     agentsCache = null
     return null
   }
-  return agentsCache.agents as T[]
+  const agents = agentsCache.agents as T[]
+  // Never serve a cached empty list — RPC may have failed or scan missed recent registrations.
+  if (agents.length === 0) return null
+  return agents
 }
 
 export function setCachedAgents(agents: unknown[]) {
+  if (agents.length === 0) return
   agentsCache = { agents, fetchedAt: Date.now() }
 }
 

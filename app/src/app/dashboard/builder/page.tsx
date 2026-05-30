@@ -202,12 +202,9 @@ export default function BuilderPage() {
     setPrompt,
     setSpendCap,
     setIntervalHours,
-    saveDraft,
-    loadDraft,
     testAgent,
     approveAgent,
     testResult,
-    draftSaved,
     deployAgent,
     reset,
   } = useAgentBuilder()
@@ -307,16 +304,7 @@ export default function BuilderPage() {
             </div>
             )}
 
-            {draftSaved && (
-              <div className="rounded-lg border border-forge-border bg-forge-surface px-4 py-3 text-sm text-forge-text-muted">
-                Draft saved — reload this page and your template settings will restore.
-              </div>
-            )}
-
             <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={saveDraft}>
-                Save for later
-              </Button>
               <Button variant="secondary" onClick={() => void testAgent()}>
                 Try it out
               </Button>

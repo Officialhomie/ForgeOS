@@ -1,9 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMarketplace } from '@/hooks/useMarketplace'
-import { recoverPendingFromIpfsUri } from '@/lib/registry/pending-storage'
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
@@ -89,21 +88,6 @@ function AgentCard({
 export default function MarketplacePage() {
   const { agents, loading, error, refetch } = useMarketplace()
   const [activeCategory, setActiveCategory] = useState<Category>('all')
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const recover = params.get('recoverIpfs')
-    if (!recover) return
-    const recoverAgentId = params.get('recoverAgentId') as `0x${string}` | null
-    void recoverPendingFromIpfsUri(recover, {
-      agentId: recoverAgentId ?? undefined,
-    }).then(() => {
-      void refetch()
-      params.delete('recoverIpfs')
-      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`
-      window.history.replaceState({}, '', next)
-    })
-  }, [refetch])
 
   const filtered = activeCategory === 'all'
     ? agents

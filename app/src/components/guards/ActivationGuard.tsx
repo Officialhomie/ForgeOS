@@ -96,7 +96,7 @@ export function ActivationGuard({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [address, isConnected, pathname, setOsStatus])
+  }, [address, isConnected, walletStatus, pathname, setOsStatus])
 
   useEffect(() => {
     if (!resolved) return

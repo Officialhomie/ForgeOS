@@ -3,8 +3,7 @@
 import { useState, useCallback } from 'react'
 import { AGENT_TEMPLATES } from '@/lib/agents/templates'
 import type { AgentTemplate } from '@/lib/agents/templates'
-import { savePendingAgentToStorage } from '@/lib/registry/pending-storage'
-import type { AgentId, Hash } from '@/types'
+import type { AgentCategory, AgentId, Hash } from '@/types'
 import { buildActivationPermissions } from '@/lib/delegation/buildPermissions'
 import { rootDelegationNeedsRelayResign } from '@/lib/delegation/needs-relay-resign'
 import { getRelayTargetAddress } from '@/lib/oneshot/client'
@@ -24,6 +23,7 @@ import { createClient, custom } from 'viem'
 import { useAccount, useChainId, useSwitchChain } from 'wagmi'
 import { useOsStore } from '@/stores/os.store'
 import { useActivationStore } from '@/stores/activation.store'
+import { useAgentsStore } from '@/stores/agents.store'
 
 export type BuilderStep =
   | 'idle'
@@ -32,8 +32,6 @@ export type BuilderStep =
   | 'approving'
   | 'publishing'
   | 'deployed'
-
-const DRAFT_KEY = 'forgeos_agent_draft_v1'
 
 export interface DeployedAgent {
   agentId: string
@@ -52,7 +50,6 @@ export interface UseAgentBuilderReturn {
   spendCap: number
   intervalHours: number
   testResult: string | null
-  draftSaved: boolean
   deployedAgent: DeployedAgent | null
   error: string | null
   selectTemplate: (id: AgentId) => void
@@ -60,8 +57,6 @@ export interface UseAgentBuilderReturn {
   setPrompt: (prompt: string) => void
   setSpendCap: (cap: number) => void
   setIntervalHours: (hours: number) => void
-  saveDraft: () => void
-  loadDraft: () => boolean
   testAgent: () => Promise<void>
   approveAgent: () => Promise<void>
   deployAgent: () => Promise<void>
@@ -76,7 +71,6 @@ export function useAgentBuilder(): UseAgentBuilderReturn {
   const [spendCap, setSpendCap] = useState(500)
   const [intervalHours, setIntervalHours] = useState(1)
   const [testResult, setTestResult] = useState<string | null>(null)
-  const [draftSaved, setDraftSaved] = useState(false)
   const [deployedAgent, setDeployedAgent] = useState<DeployedAgent | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [approvedDelegationHash, setApprovedDelegationHash] = useState<Hash | null>(null)
@@ -105,49 +99,8 @@ export function useAgentBuilder(): UseAgentBuilderReturn {
     }
     setConfigValues(defaults)
     setStep('configuring')
-    setDraftSaved(false)
   }, [])
 
-  const saveDraft = useCallback(() => {
-    if (!selectedTemplate) return
-    try {
-      const payload = {
-        templateId: selectedTemplate.id,
-        prompt,
-        spendCap,
-        intervalHours,
-        configValues,
-      }
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(payload))
-      setDraftSaved(true)
-      setError(null)
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setError(msg)
-    }
-  }, [selectedTemplate, prompt, spendCap, intervalHours, configValues])
-
-  const loadDraft = useCallback(() => {
-    try {
-      const raw = localStorage.getItem(DRAFT_KEY)
-      if (!raw) return false
-      const d = JSON.parse(raw) as {
-        templateId: AgentId
-        prompt: string
-        spendCap: number
-        intervalHours: number
-        configValues: Record<string, string | number | boolean>
-      }
-      selectTemplate(d.templateId)
-      setPrompt(d.prompt)
-      setSpendCap(d.spendCap)
-      setIntervalHours(d.intervalHours)
-      setConfigValues(d.configValues)
-      return true
-    } catch {
-      return false
-    }
-  }, [selectTemplate])
 
   const testAgent = useCallback(async () => {
     if (!selectedTemplate) return
@@ -309,21 +262,61 @@ export function useAgentBuilder(): UseAgentBuilderReturn {
         metadataSource: data.metadataSource,
         pinataError: data.pinataError ?? null,
       })
-      savePendingAgentToStorage({
-        agentId: data.agentId as `0x${string}`,
-        creator: smartAccountAddress as `0x${string}`,
-        name: selectedTemplate.name,
-        metadataUri: data.ipfsUri,
-        metadata: {
-          description: selectedTemplate.description,
-          category: selectedTemplate.category,
-          promptTemplate: prompt,
+
+      // Fetch the real agent record the server just added to pendingPublished[].
+      // Use ?refresh=1 so the cache is busted and the pending agent is included.
+      let realName = selectedTemplate.name
+      let realDescription = selectedTemplate.description
+      let realCategory = selectedTemplate.category as AgentCategory
+      let realPrompt = prompt
+      try {
+        const regRes = await fetch('/api/registry/agents?refresh=1')
+        const regData = (await regRes.json()) as {
+          success: boolean
+          agents?: Array<{
+            agentId: `0x${string}`
+            name: string
+            metadata: { description?: string; category?: string; promptTemplate?: string } | null
+          }>
+        }
+        const found = regData.success
+          ? (regData.agents ?? []).find((a) => a.agentId === data.agentId)
+          : null
+        if (found) {
+          realName = found.name
+          realDescription = found.metadata?.description ?? realDescription
+          realCategory = (found.metadata?.category as AgentCategory | undefined) ?? realCategory
+          realPrompt = found.metadata?.promptTemplate ?? realPrompt
+        }
+      } catch {
+        // Registry API unavailable — fall back to template values
+      }
+
+      useAgentsStore.getState().addInstalledAgent(data.agentId as AgentId, {
+        id: data.agentId as AgentId,
+        name: realName,
+        description: realDescription,
+        icon: '🤖',
+        category: realCategory,
+        status: 'active',
+        installedAt: Math.floor(Date.now() / 1000),
+        lastRunAt: null,
+        nextRunAt: null,
+        runCount: 0,
+        successCount: 0,
+        failureCount: 0,
+        delegation: rootDelegation,
+        redelegations: [],
+        earningsLifetime: 0n,
+        earningsToday: 0n,
+        gasSaved: 0n,
+        config: {
+          veniceModel: 'llama-3.3-70b',
+          scheduleInterval: selectedTemplate.defaultIntervalSeconds,
+          customInstructions: realPrompt,
         },
-        taskId: data.taskId,
-        publishedAt: Date.now(),
       })
       setStep('deployed')
-      localStorage.removeItem(DRAFT_KEY)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Publish failed')
       setStep('configuring')
@@ -358,7 +351,6 @@ export function useAgentBuilder(): UseAgentBuilderReturn {
     spendCap,
     intervalHours,
     testResult,
-    draftSaved,
     deployedAgent,
     error,
     selectTemplate,
@@ -366,8 +358,6 @@ export function useAgentBuilder(): UseAgentBuilderReturn {
     setPrompt,
     setSpendCap,
     setIntervalHours,
-    saveDraft,
-    loadDraft,
     testAgent,
     approveAgent,
     deployAgent,

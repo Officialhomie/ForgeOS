@@ -156,7 +156,7 @@ export async function GET(request: Request) {
     clearAgentsCache()
   }
 
-  const cached = getCachedAgents<{
+  type AgentRow = {
     agentId: `0x${string}`
     creator: `0x${string}`
     name: string
@@ -164,9 +164,13 @@ export async function GET(request: Request) {
     metadata: object | null
     blockNumber: string | null
     txHash: `0x${string}` | null
-  }>()
+  }
+
+  const pending = getPendingPublishedAgents()
+  const cached = getCachedAgents<AgentRow>()
   if (cached) {
-    return NextResponse.json({ success: true, agents: cached, cached: true })
+    const agents = mergeAgentsWithPending(cached, pending)
+    return NextResponse.json({ success: true, agents, cached: true })
   }
 
   try {
@@ -175,7 +179,6 @@ export async function GET(request: Request) {
       transport: http(RPC_URL),
     })
 
-    const pending = getPendingPublishedAgents()
     const forceFullScan = url.searchParams.get('refresh') === '1'
 
     const fromGraph = await agentsFromSubgraph(client)

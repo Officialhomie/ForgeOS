@@ -246,7 +246,10 @@ export async function fetchRegistryLogs(
 
 // ─── AGENTS LIST CACHE ────────────────────────────────────────────────────────
 
-const AGENTS_CACHE_TTL_MS = Number(process.env.REGISTRY_AGENTS_CACHE_MS ?? '120000')
+// Expire: synchronous refresh needed (every 5 min by default).
+const AGENTS_CACHE_TTL_MS = Number(process.env.REGISTRY_AGENTS_CACHE_MS ?? '300000')
+// Stale: return cache immediately but kick off a background refresh.
+const AGENTS_CACHE_STALE_MS = Number(process.env.REGISTRY_AGENTS_STALE_MS ?? '60000')
 
 interface AgentsCacheEntry {
   agents: unknown[]
@@ -265,6 +268,13 @@ export function getCachedAgents<T>(): T[] | null {
   // Never serve a cached empty list — RPC may have failed or scan missed recent registrations.
   if (agents.length === 0) return null
   return agents
+}
+
+/** True when cached data is older than STALE_MS — triggers a background refresh while
+ *  still returning the stale data immediately (stale-while-revalidate). */
+export function isCacheStale(): boolean {
+  if (!agentsCache) return false
+  return Date.now() - agentsCache.fetchedAt > AGENTS_CACHE_STALE_MS
 }
 
 export function setCachedAgents(agents: unknown[]) {

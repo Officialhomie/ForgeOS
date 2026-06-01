@@ -11,7 +11,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { createPublicClient, http } from 'viem'
+import { createPublicClient, http, type PublicClient } from 'viem'
 import { sepolia } from 'viem/chains'
 import { GET_AGENTS } from '@/lib/graph/queries'
 import { queryGraph } from '@/lib/graph/client'
@@ -99,7 +99,7 @@ async function agentsFromSubgraph(
   }
 }
 
-async function agentsFromRpc(client: ReturnType<typeof createPublicClient>): Promise<MarketplaceAgentRow[]> {
+async function agentsFromRpc(client: PublicClient): Promise<MarketplaceAgentRow[]> {
   const configuredFromBlock = BigInt(process.env.REGISTRY_DEPLOY_BLOCK ?? '0')
   const latestBlock = await client.getBlockNumber()
   const fromBlock = resolveListingFromBlock(latestBlock, configuredFromBlock)
@@ -138,7 +138,7 @@ async function agentsFromRpc(client: ReturnType<typeof createPublicClient>): Pro
 const RPC_SCAN_TIMEOUT_MS = Number(process.env.REGISTRY_RPC_SCAN_TIMEOUT_MS ?? '8000')
 
 /** Wraps agentsFromRpc with a hard timeout. Returns [] on timeout instead of hanging. */
-async function agentsFromRpcSafe(client: ReturnType<typeof createPublicClient>): Promise<MarketplaceAgentRow[]> {
+async function agentsFromRpcSafe(client: PublicClient): Promise<MarketplaceAgentRow[]> {
   return Promise.race([
     agentsFromRpc(client),
     new Promise<MarketplaceAgentRow[]>((resolve) =>
@@ -151,7 +151,7 @@ async function agentsFromRpcSafe(client: ReturnType<typeof createPublicClient>):
 
 let isRefreshing = false
 
-async function refreshCacheBackground(client: ReturnType<typeof createPublicClient>): Promise<void> {
+async function refreshCacheBackground(client: PublicClient): Promise<void> {
   if (isRefreshing) return
   isRefreshing = true
   try {
@@ -194,7 +194,7 @@ export async function GET(request: Request) {
     // Stale-while-revalidate: cache is valid but getting old — refresh in the background
     // so the *next* request is already fast. Never blocks the current response.
     if (isCacheStale() && RPC_URL) {
-      const client = createPublicClient({ chain: sepolia, transport: http(RPC_URL) })
+      const client = createPublicClient({ chain: sepolia, transport: http(RPC_URL) }) as PublicClient
       void refreshCacheBackground(client)
     }
     return NextResponse.json({ success: true, agents, cached: true })
@@ -204,7 +204,7 @@ export async function GET(request: Request) {
     const client = createPublicClient({
       chain: sepolia,
       transport: http(RPC_URL),
-    })
+    }) as PublicClient
 
     const forceFullScan = url.searchParams.get('refresh') === '1'
 

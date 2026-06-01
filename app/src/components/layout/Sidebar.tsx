@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils'
 import { NAV_ITEMS } from '@/lib/constants'
 import { useOsStore } from '@/stores/os.store'
+import { ForgeLogo } from '@/components/ui/ForgeLogo'
 
 const ICONS = {
   LayoutDashboard,
@@ -33,9 +34,9 @@ export function Sidebar() {
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-forge-border bg-forge-surface px-3 py-4">
-      <div className="mb-6 px-3">
-        <span className="text-lg font-bold text-forge-orange">ForgeOS</span>
-        <p className="text-xs text-forge-text-subtle">Your agent control center</p>
+      <div className="mb-6 px-1">
+        <ForgeLogo markSize={28} />
+        <p className="mt-1.5 px-2 text-xs text-forge-text-subtle">Your agent control center</p>
       </div>
       <nav className="flex flex-1 flex-col gap-1">
         {NAV_ITEMS.map((item) => {

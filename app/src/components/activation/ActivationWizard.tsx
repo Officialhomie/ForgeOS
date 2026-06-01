@@ -9,6 +9,7 @@ import { StepTwo_SmartAccount } from '@/components/activation/StepTwo_SmartAccou
 import { ActivationProvider, useActivationContext } from '@/providers/ActivationProvider'
 import type { ActivationStepId } from '@/types/activation'
 import Link from 'next/link'
+import { ForgeLogo } from '@/components/ui/ForgeLogo'
 
 const STEP_COMPONENTS: Record<
   Exclude<ActivationStepId, 'complete'>,
@@ -52,8 +53,8 @@ function ActivationWizardInner() {
 
       <header className="relative z-10 border-b border-forge-border-subtle px-6 py-4">
         <div className="mx-auto flex max-w-3xl items-center justify-between">
-          <Link href="/" className="font-[family-name:var(--font-display)] text-lg font-bold tracking-wide text-forge-orange">
-            ForgeOS
+          <Link href="/">
+            <ForgeLogo markSize={28} />
           </Link>
         </div>
       </header>

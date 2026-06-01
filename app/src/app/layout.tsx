@@ -14,8 +14,42 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'ForgeOS',
-  description: 'Run AI agents with spending limits and permissions you control',
+  title: {
+    default: 'ForgeOS',
+    template: '%s | ForgeOS',
+  },
+  description:
+    'Run AI agents with spending limits and permissions you control. Powered by Smart Accounts, Venice AI, and x402 payments.',
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? 'https://forgeos.app',
+  ),
+  openGraph: {
+    title: 'ForgeOS',
+    description: 'Run AI agents with spending limits and permissions you control.',
+    siteName: 'ForgeOS',
+    type: 'website',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'ForgeOS',
+    description: 'Run AI agents with spending limits and permissions you control.',
+  },
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/favicon.ico',
+    apple: '/apple-icon',
+  },
+  keywords: [
+    'AI agents',
+    'Smart Accounts',
+    'ERC-4337',
+    'Venice AI',
+    'x402',
+    'delegation',
+    'permissions',
+    'DeFi automation',
+  ],
 }
 
 export default function RootLayout({

@@ -7,6 +7,7 @@ import { useActivityStream } from '@/hooks/useActivityStream'
 import { SubDelegationInitializer } from '@/components/SubDelegationInitializer'
 import { SubDelegationBanner } from '@/components/SubDelegationBanner'
 import { ExpiryRenewalBanner } from '@/components/ExpiryRenewalBanner'
+import { ForgeLogo } from '@/components/ui/ForgeLogo'
 import { useEffect, useState, type ReactNode } from 'react'
 
 export function DashboardShell({ children }: { children: ReactNode }) {
@@ -54,7 +55,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           />
           <div className="relative h-full w-60 overflow-y-auto bg-forge-surface border-r border-forge-border">
             <div className="flex items-center justify-between border-b border-forge-border px-4 py-3">
-              <span className="text-sm font-bold text-forge-orange">ForgeOS</span>
+              <ForgeLogo markSize={24} />
               <button
                 type="button"
                 onClick={() => setNavOpen(false)}

@@ -1,0 +1,67 @@
+<svg viewBox="0 0 1500 500" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica Neue, Arial, sans-serif">
+  <defs>
+    <linearGradient id="fg" x1="0.5" y1="1" x2="0.5" y2="0">
+      <stop offset="0%" stop-color="#ea580c"/>
+      <stop offset="60%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#fb923c"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Grid pattern -->
+    <pattern id="grid" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M60 0 L0 0 0 60" fill="none" stroke="rgba(249,115,22,0.05)" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1500" height="500" fill="#09090b"/>
+
+  <!-- Grid -->
+  <rect width="1500" height="500" fill="url(#grid)"/>
+
+  <!-- Center glow -->
+  <ellipse cx="600" cy="250" rx="500" ry="300" fill="url(#glow)"/>
+
+  <!-- Logo mark: positioned left-center -->
+  <g transform="translate(180, 160)">
+    <!-- Squircle -->
+    <rect x="0" y="0" width="180" height="180" rx="40" fill="#18181b"/>
+    <rect x="1" y="1" width="178" height="178" rx="39" fill="none" stroke="#f97316" stroke-width="2" stroke-opacity="0.4"/>
+    <!-- F mark scaled 4.5x -->
+    <!-- vertical stroke: x=49.5 y=45 w=20.25 h=90 -->
+    <rect x="49.5" y="45" width="20.25" height="90" rx="10" fill="url(#fg)"/>
+    <!-- top bar: x=49.5 y=45 w=65.25 h=20.25 -->
+    <rect x="49.5" y="45" width="65.25" height="20.25" rx="10" fill="url(#fg)"/>
+    <!-- mid bar: x=49.5 y=84.4 w=47.25 h=16.9 -->
+    <rect x="49.5" y="84.4" width="47.25" height="16.9" rx="8.4" fill="url(#fg)"/>
+    <!-- spark -->
+    <circle cx="126" cy="55.1" r="12.4" fill="#fb923c"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="410" y="290" font-size="96" font-weight="700" letter-spacing="-3" fill="#fafafa">Forge</text>
+  <text x="683" y="290" font-size="96" font-weight="700" letter-spacing="-3" fill="#f97316">OS</text>
+
+  <!-- Tagline -->
+  <text x="410" y="346" font-size="26" font-weight="400" fill="#71717a" letter-spacing="0.3">
+    Run AI agents with spending limits and permissions you control
+  </text>
+
+  <!-- Right side: tech badges -->
+  <g transform="translate(1120, 170)">
+    <!-- Badge 1 -->
+    <rect x="0" y="0" width="200" height="36" rx="6" fill="#18181b" stroke="#3f3f46" stroke-width="1"/>
+    <text x="100" y="23" font-size="14" font-weight="500" fill="#a1a1aa" text-anchor="middle">Smart Accounts (ERC-4337)</text>
+    <!-- Badge 2 -->
+    <rect x="0" y="48" width="200" height="36" rx="6" fill="#18181b" stroke="#3f3f46" stroke-width="1"/>
+    <text x="100" y="71" font-size="14" font-weight="500" fill="#a1a1aa" text-anchor="middle">Venice AI · ERC-7715</text>
+    <!-- Badge 3 -->
+    <rect x="0" y="96" width="200" height="36" rx="6" fill="#18181b" stroke="#3f3f46" stroke-width="1"/>
+    <text x="100" y="119" font-size="14" font-weight="500" fill="#a1a1aa" text-anchor="middle">x402 + ERC-7710</text>
+    <!-- Badge 4 -->
+    <rect x="0" y="144" width="200" height="36" rx="6" fill="rgba(249,115,22,0.08)" stroke="rgba(249,115,22,0.3)" stroke-width="1"/>
+    <text x="100" y="167" font-size="14" font-weight="500" fill="#f97316" text-anchor="middle">1Shot API · A2A</text>
+  </g>
+</svg>

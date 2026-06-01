@@ -15,8 +15,7 @@ export function buildActivationPermissions(
 ): PermissionRequestParameter[] {
   const monthlyCap = options?.monthlyCapUsdc ?? 500
   const tokenAddress = options?.usdcAddress ?? CONTRACTS.usdc
-  // MetaMask RPC cannot serialize BigInt in permission params.
-  const periodAmount = monthlyCap * 1_000_000
+  const periodAmount = BigInt(monthlyCap * 1_000_000)
 
   return [
     {

@@ -16,7 +16,7 @@ enum TreasuryEventType {
 """
 A delegation granted on OSKernel — root (hop=0), sub (hop=1), or re-delegation (hop≥2).
 """
-type Delegation @entity {
+type Delegation @entity(immutable: false) {
   id: ID!
   hash: Bytes!
   delegator: Bytes!
@@ -30,9 +30,10 @@ type Delegation @entity {
 An agent registered on ForgeOSRegistry. totalRuns / successfulRuns are updated
 by the cron route; the subgraph tracks on-chain registration data only.
 """
-type Agent @entity {
+type Agent @entity(immutable: false) {
   id: ID!
   agentId: Bytes!
+  owner: Bytes!
   name: String!
   endpoint: String!
   active: Boolean!
@@ -45,7 +46,7 @@ type Agent @entity {
 """
 Singleton treasury summary (id = "treasury").
 """
-type TreasuryState @entity {
+type TreasuryState @entity(immutable: false) {
   id: ID!
   balance: BigInt!
   totalFunded: BigInt!
@@ -57,7 +58,7 @@ type TreasuryState @entity {
 An on-chain treasury event — fund deposit, agent payment, or revenue distribution.
 userShare / refillShare / platformShare are non-null only for DISTRIBUTION events.
 """
-type TreasuryEvent @entity {
+type TreasuryEvent @entity(immutable: true) {
   id: ID!
   eventType: TreasuryEventType!
   amount: BigInt!
@@ -73,7 +74,7 @@ type TreasuryEvent @entity {
 """
 Unified activity feed — one entry per on-chain event, across all contracts.
 """
-type ActivityEvent @entity {
+type ActivityEvent @entity(immutable: true) {
   id: ID!
   eventType: String!
   actor: Bytes!
@@ -91,7 +92,7 @@ type ActivityEvent @entity {
 Tracks every address that has ever received a delegation, with their hop depth.
 Used to infer hop count for subsequent delegations without call handlers.
 """
-type KnownDelegatee @entity {
+type KnownDelegatee @entity(immutable: false) {
   id: ID!
   hopCount: Int!
 }
@@ -100,7 +101,7 @@ type KnownDelegatee @entity {
 Singleton tracking all currently active delegation hashes.
 Used by AllDelegationsRevoked to efficiently mass-revoke.
 """
-type KernelState @entity {
+type KernelState @entity(immutable: false) {
   id: ID!
   activeDelegationHashes: [String!]!
 }

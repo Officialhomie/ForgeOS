@@ -21,6 +21,7 @@ export const GET_AGENTS = `
     agents(first: $first, orderBy: registeredAt, orderDirection: desc) {
       id
       agentId
+      owner
       name
       endpoint
       active

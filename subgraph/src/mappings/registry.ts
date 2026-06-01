@@ -2,6 +2,7 @@ import { BigInt } from '@graphprotocol/graph-ts'
 import {
   AgentDeactivated,
   AgentRegistered,
+  ForgeOSRegistry,
 } from '../../generated/ForgeOSRegistry/ForgeOSRegistry'
 import { ActivityEvent, Agent } from '../../generated/schema'
 
@@ -12,13 +13,20 @@ export function handleAgentRegistered(event: AgentRegistered): void {
   // incremented later by the cron route writing back via The Graph's admin API.
   const agent = new Agent(agentIdHex)
   agent.agentId = event.params.agentId
+  agent.owner = event.params.owner
   agent.name = event.params.name
-  agent.endpoint = ''
   agent.active = true
   agent.totalRuns = 0
   agent.successfulRuns = 0
   agent.totalSpent = BigInt.fromI32(0)
   agent.registeredAt = event.block.timestamp
+
+  // Fetch endpoint from the registry contract at index time so the app can
+  // resolve metadata without a separate RPC call per agent.
+  const registry = ForgeOSRegistry.bind(event.address)
+  const record = registry.try_getAgent(event.params.agentId)
+  agent.endpoint = record.reverted ? '' : record.value.endpoint
+
   agent.save()
 
   const activityId = event.transaction.hash.toHexString() + '-' + event.logIndex.toString()

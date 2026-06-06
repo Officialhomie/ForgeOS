@@ -7,10 +7,6 @@ import { APP_URL } from '@/lib/constants'
 import { getDelegationBundle } from '@/lib/delegation/bundle-store'
 import type { AgentId, Address, Hash } from '@/types'
 
-interface ServerAgentConfig {
-  agentId: AgentId
-}
-
 function getEnabledAgentIds(): AgentId[] {
   return (process.env.ENABLED_AGENTS ?? 'defi-rebalancer,payment-executor')
     .split(',')

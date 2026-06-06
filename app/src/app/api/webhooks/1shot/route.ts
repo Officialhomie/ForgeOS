@@ -33,15 +33,21 @@ export async function POST(request: Request) {
     return new Response('OK', { status: 200 })
   }
 
-  // ── Ed25519 signature verification ────────────────────────────────────────
+  // ── Ed25519 signature verification ──────────────────────────────────────
   const publicKey = process.env.ONESHOT_WEBHOOK_SECRET
   if (publicKey) {
+    // Secret configured — verify every request and reject invalid signatures.
+    // Return 200 so 1Shot does not retry (retries cannot fix a bad signature).
     const sig = extractSignature(request.headers) ?? payload.signature
     if (!sig || !verifyWebhookSignature(rawBody, sig, publicKey)) {
-      // Log but still return 200 to avoid infinite retries.
-      console.warn('[webhook] Invalid 1Shot signature for taskId:', payload.taskId)
+      console.warn('[webhook] Invalid 1Shot signature — payload rejected for taskId:', payload.taskId)
       return new Response('OK', { status: 200 })
     }
+  } else if (process.env.NODE_ENV === 'production') {
+    // In production, ONESHOT_WEBHOOK_SECRET must be set.
+    // Processing unsigned webhooks allows any caller to inject fake confirmations.
+    console.error('[webhook] ONESHOT_WEBHOOK_SECRET not set in production — unsigned webhook rejected')
+    return new Response('OK', { status: 200 })
   }
 
   // ── Update task store ─────────────────────────────────────────────────────
@@ -86,6 +92,7 @@ export async function POST(request: Request) {
     taskId: payload.taskId,
     timestamp: Math.floor(Date.now() / 1000),
     status: isConfirmed ? 'confirmed' : isFailed ? 'failed' : 'pending',
+    source: 'webhook',
   }
 
   activityEmitter.emitActivity(event)

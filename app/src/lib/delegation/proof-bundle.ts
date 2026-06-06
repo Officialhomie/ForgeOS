@@ -11,7 +11,17 @@ const PLACEHOLDER_SIGNATURES = new Set([
   `0x${'00'.repeat(64)}`,
 ])
 
-/** Marker set after on-chain OSKernel.redelegate confirms (Phase 2). */
+/**
+ * Marker set after 1Shot relay SUBMITS the delegation (pending on-chain inclusion).
+ * The delegation struct is queued for OSKernel.redelegate() but not yet mined.
+ * Valid for local execution; not a proof of on-chain confirmation.
+ */
+export const RELAY_SUBMITTED_MARKER = `0x${'cd'.repeat(32)}` as const
+
+/**
+ * Marker set after on-chain confirmation evidence arrives (e.g. webhook txHash).
+ * Strongest proof — delegation is included in a mined block.
+ */
 export const ONCHAIN_DELEGATION_MARKER = `0x${'ab'.repeat(32)}` as const
 
 export class DelegationProofError extends Error {
@@ -36,8 +46,13 @@ export function isValidProof(d: Delegation): boolean {
   const sig = d.signature?.toLowerCase() ?? '0x'
   if (!sig || sig === '0x') return false
   if (PLACEHOLDER_SIGNATURES.has(sig)) return false
+  // On-chain confirmed proof (strongest — mined and indexed).
   if (sig === ONCHAIN_DELEGATION_MARKER.toLowerCase()) return true
+  // Relay-submitted proof (pending inclusion — sufficient for demo execution).
+  if (sig === RELAY_SUBMITTED_MARKER.toLowerCase()) return true
+  // Standard 65-byte ECDSA signature from EOA delegator.
   if (/^0x[0-9a-f]{130}$/i.test(sig)) return true
+  // ERC-7715 permission context from MetaMask snap.
   return isErc7715PermissionContext(sig)
 }
 

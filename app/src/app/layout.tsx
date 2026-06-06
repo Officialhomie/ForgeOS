@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   description:
     'Run AI agents with spending limits and permissions you control. Powered by Smart Accounts, Venice AI, and x402 payments.',
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL ?? 'https://forgeos.app',
+    process.env.NEXT_PUBLIC_APP_URL ?? 'https://forgeagent.vercel.app',
   ),
   openGraph: {
     title: 'ForgeOS',
@@ -35,11 +35,7 @@ export const metadata: Metadata = {
     title: 'ForgeOS',
     description: 'Run AI agents with spending limits and permissions you control.',
   },
-  icons: {
-    icon: '/icon.svg',
-    shortcut: '/favicon.ico',
-    apple: '/apple-icon',
-  },
+  // File-based icons: app/icon.svg, app/apple-icon.tsx, app/favicon.ico
   keywords: [
     'AI agents',
     'Smart Accounts',

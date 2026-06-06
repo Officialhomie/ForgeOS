@@ -29,6 +29,7 @@ const STATUS_BADGE: Record<AgentStatus, BadgeVariant> = {
   paused: 'paused',
   inactive: 'paused',
   failed: 'error',
+  pending: 'paused',
 }
 
 // ─── METRIC CARD ──────────────────────────────────────────────────────────────

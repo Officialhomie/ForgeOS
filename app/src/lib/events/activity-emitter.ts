@@ -8,11 +8,6 @@
 import { EventEmitter } from 'events'
 import type { ActivityEvent, OneShotTask } from '@/types'
 
-type EmitterEvents = {
-  activity: [event: ActivityEvent]
-  task: [task: OneShotTask]
-}
-
 class ActivityEmitter extends EventEmitter {
   emitActivity(event: ActivityEvent): void {
     this.emit('activity', event)

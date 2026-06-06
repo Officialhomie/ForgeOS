@@ -77,23 +77,22 @@ export function useTreasury(): {
     setTreasury(mapped)
     setRecentPayments(mapTreasuryPayments(summary?.treasuryEvents ?? []))
     setDailySpend(aggregateDailyPayments(daily?.treasuryEvents ?? []))
-    setError(null)
+    queueMicrotask(() => setError(null))
     return mapped   // React Query v5 requires a non-undefined return value
   }, [setTreasury])
 
   const query = useQuery({
     queryKey: ['treasury', 'graph'],
     queryFn: fetchLive,
-    enabled: graphOn,
+    // Always enabled — fetchLive reads the live on-chain balance unconditionally
+    // and only attempts subgraph queries when isGraphEnabled(). This means the
+    // treasury page always shows a real balance even without a subgraph configured.
+    enabled: true,
     refetchInterval: GRAPH_POLL_MS,
     staleTime: GRAPH_POLL_MS / 2,
   })
 
   useEffect(() => {
-    if (!graphOn) {
-      setLoading(false)
-      return
-    }
     setLoading(query.isLoading)
     // fetchLive handles subgraph errors internally (allSettled) — only surface
     // errors that prevent even the live balance from loading.
@@ -101,10 +100,10 @@ export function useTreasury(): {
       const msg = query.error instanceof Error ? query.error.message : ''
       const isSubgraphSyncing = msg.includes('not started syncing') || msg.includes('Subgraph')
       if (!isSubgraphSyncing) {
-        setError(msg || 'Failed to load treasury')
+        queueMicrotask(() => setError(msg || 'Failed to load treasury'))
       }
     }
-  }, [graphOn, query.isLoading, query.isError, query.error, setLoading])
+  }, [query.isLoading, query.isError, query.error, setLoading])
 
   const topUp = useCallback(async (amountUsdc: string): Promise<{ taskId: string }> => {
     const res = await fetch('/api/relay/fund', {

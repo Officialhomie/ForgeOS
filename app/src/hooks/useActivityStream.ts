@@ -43,6 +43,9 @@ export function useActivityStream() {
             delegationHash: null,
             timestamp: task.confirmedAt ?? Math.floor(Date.now() / 1000),
             status: task.status === 'Confirmed' ? 'confirmed' : 'failed',
+            // task events are driven by the webhook callback, which is the most
+            // trusted evidence source for on-chain confirmation.
+            source: 'webhook',
           }
           pushActivity(activity)
         }

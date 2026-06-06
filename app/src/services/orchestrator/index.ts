@@ -55,6 +55,8 @@ export async function orchestrate(input: OrchestratorInput): Promise<Orchestrato
     subDelegationHash,
     reDelegationHash,
     sessionId,
+    route.primaryAgent,
+    route.secondaryAgent,
   )
 
   return {

@@ -127,7 +127,7 @@ export async function POST(request: Request) {
 
     const activity: ActivityEvent = {
       id: `agent_run_${taskId}`,
-      type: 'agent_run_confirmed',
+      type: 'agent_run_submitted',
       agentId,
       title: `${template?.name ?? agentId} triggered`,
       description: `Scheduled run — task ${taskId}`,
@@ -136,6 +136,7 @@ export async function POST(request: Request) {
       delegationHash: subDelegationHash,
       timestamp: Math.floor(Date.now() / 1000),
       status: 'pending',
+      source: 'local',
     }
     activityEmitter.emitActivity(activity)
 

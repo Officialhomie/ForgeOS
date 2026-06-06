@@ -36,7 +36,7 @@ export function useSystemHealth(): SystemHealthState {
   }, [])
 
   useEffect(() => {
-    refresh()
+    queueMicrotask(refresh)
     const id = setInterval(refresh, POLL_INTERVAL_MS)
     return () => clearInterval(id)
   }, [refresh])

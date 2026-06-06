@@ -105,11 +105,13 @@ export async function parseA2AIntent(
   defiHash: Hash,
   redelHash: Hash,
   sessionId?: string,
+  primaryAgent: string = 'defi-rebalancer',
+  secondaryAgent: string | null = 'payment-executor',
 ): Promise<ActionPlan> {
   const venice = await getVeniceClient()
 
   const sessionNote = sessionId
-    ? `\nCollaboration session: ${sessionId}. Hop 2 must reference hop 1 budget/outputs.`
+    ? `\nCollaboration session: ${sessionId}. Primary agent: ${primaryAgent}. Secondary agent: ${secondaryAgent ?? 'none'}. Hop 2 must reference hop 1 budget/outputs.`
     : ''
 
   const { completion } = await venice.chat({
@@ -120,7 +122,16 @@ export async function parseA2AIntent(
   })
 
   const content = completion.choices[0]?.message.content ?? '{}'
-  return buildA2APlan(content, intent, completion.model, rootHash, defiHash, redelHash)
+  return buildA2APlan(
+    content,
+    intent,
+    completion.model,
+    rootHash,
+    defiHash,
+    redelHash,
+    primaryAgent,
+    secondaryAgent,
+  )
 }
 
 // ─── PARSER ───────────────────────────────────────────────────────────────────
@@ -132,6 +143,8 @@ function buildA2APlan(
   rootHash: Hash,
   defiHash: Hash,
   redelHash: Hash,
+  primaryAgent: string,
+  secondaryAgent: string | null,
 ): ActionPlan {
   const id = `plan_a2a_${Math.random().toString(36).slice(2, 10)}`
 
@@ -146,11 +159,14 @@ function buildA2APlan(
   }
 
   const rawActions = parsed.actions ?? []
+  const expectedPrimaryAgent = primaryAgent
+  const expectedSecondaryAgent = secondaryAgent ?? 'payment-executor'
 
   const actions: PlannedAction[] = rawActions.map((a, i) => {
     // Hop 1 (DeFiAgent) uses root + defi delegation chain
     // Hop 2 (PaymentAgent) uses root + defi + redel chain
-    const isHop2 = i === 1 || (a.agentId ?? '').includes('payment')
+    const isHop2 =
+      i === 1 || (a.agentId ?? '').includes('payment') || (a.agentId ?? '') === expectedSecondaryAgent
     const delegationChain: Hash[] = isHop2
       ? [rootHash, defiHash, redelHash]
       : [rootHash, defiHash]
@@ -158,7 +174,9 @@ function buildA2APlan(
     return {
       id: a.id ?? `action_${i}`,
       type: (a.type as ActionType) ?? (isHop2 ? 'erc20_transfer' : 'erc20_swap'),
-      agentId: (a.agentId as AgentId) ?? (isHop2 ? 'payment-executor' : 'defi-rebalancer'),
+      agentId:
+        (a.agentId as AgentId) ??
+        (isHop2 ? (expectedSecondaryAgent as AgentId) : (expectedPrimaryAgent as AgentId)),
       delegationChain,
       target: (a.target as Address) ?? '0x0000000000000000000000000000000000000000',
       calldata: (a.calldata as `0x${string}`) ?? '0x',
@@ -175,7 +193,7 @@ function buildA2APlan(
     const hop2Fallback: PlannedAction = {
       id: 'hop2_fallback',
       type: 'erc20_transfer',
-      agentId: 'payment-executor',
+      agentId: expectedSecondaryAgent as AgentId,
       delegationChain: [rootHash, defiHash, redelHash],
       target: '0x0000000000000000000000000000000000000000',
       calldata: '0x',
@@ -201,4 +219,3 @@ function buildA2APlan(
     veniceModel: model,
   }
 }
-

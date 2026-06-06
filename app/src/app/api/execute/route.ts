@@ -80,7 +80,7 @@ export async function POST(request: Request) {
 
     const activity: ActivityEvent = {
       id: `exec_${taskId}`,
-      type: 'agent_run_confirmed',
+      type: 'agent_run_submitted',
       agentId: actionPlan.actions[0]?.agentId ?? null,
       title: 'Transaction submitted',
       description: `Task ${taskId} — waiting for 1Shot confirmation`,
@@ -89,13 +89,16 @@ export async function POST(request: Request) {
       delegationHash: actionPlan.actions[0]?.delegationChain?.[0] ?? null,
       timestamp: Math.floor(Date.now() / 1000),
       status: 'pending',
+      source: 'local',
     }
     activityEmitter.emitActivity(activity)
 
     return NextResponse.json({
       success: true,
       taskId,
-      userOpHashes: userOps.map((_, i) => `0x${i}` as `0x${string}`),
+      // userOpHashes are not available at submission time — they are provided by the
+      // relay via webhook once the transaction is included on-chain.
+      userOpHashes: [] as `0x${string}`[],
       estimatedConfirmation: 15,
       timing: timer.end(),
     })

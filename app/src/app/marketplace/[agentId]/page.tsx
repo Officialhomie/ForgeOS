@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useState, useEffect } from 'react'
+import { use, useState } from 'react'
 import Link from 'next/link'
 import { useMarketplace } from '@/hooks/useMarketplace'
 import { useOsStore } from '@/stores/os.store'
@@ -8,7 +8,6 @@ import { useAgentsStore } from '@/stores/agents.store'
 import { Button } from '@/components/ui/Button'
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton'
 import { Tooltip } from '@/components/ui/Tooltip'
-import type { MarketplaceAgent } from '@/hooks/useMarketplace'
 import type { AgentId } from '@/types'
 
 // ─── RULE ROW ─────────────────────────────────────────────────────────────────
@@ -72,20 +71,13 @@ export default function AgentDetailPage({
   const { agents, loading, installAgent } = useMarketplace()
   const rootDelegation = useOsStore((s) => s.rootDelegation)
   const installedMarketplaceIds = useAgentsStore((s) => s.installedMarketplaceIds)
-  const [agent, setAgent] = useState<MarketplaceAgent | null>(null)
   const [installing, setInstalling] = useState(false)
   const [installResult, setInstallResult] = useState<{ success: boolean; error?: string } | null>(null)
 
+  const agent = agents.find((a) => a.agentId === agentId) ?? null
   const isInstalled =
     installResult?.success === true ||
     installedMarketplaceIds.includes(agentId as AgentId)
-
-  useEffect(() => {
-    if (!loading && agents.length > 0) {
-      const found = agents.find((a) => a.agentId === agentId)
-      setAgent(found ?? null)
-    }
-  }, [agents, loading, agentId])
 
   const handleInstall = async () => {
     if (!agent) return

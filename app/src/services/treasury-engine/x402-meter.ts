@@ -28,6 +28,7 @@ const AGENT_TREASURY_ABI = [
       { name: 'amount', type: 'uint256' },
       { name: 'agentId', type: 'bytes32' },
       { name: 'proof', type: 'bytes' },
+      { name: 'user', type: 'address' },
     ],
     outputs: [],
   },
@@ -74,6 +75,7 @@ export async function executeX402Cycle(options: X402MeterOptions): Promise<X402C
       subscription.amount,
       agentIdToBytes32(subscription.agentId),
       delegationProof,
+      subscription.delegation.delegator,
     ],
   })
 
@@ -110,6 +112,7 @@ export async function executeX402Cycle(options: X402MeterOptions): Promise<X402C
     delegationHash: subscription.delegation.hash,
     timestamp: Math.floor(Date.now() / 1000),
     status: 'pending',
+    source: 'local',
   }
   activityEmitter.emitActivity(activity)
 

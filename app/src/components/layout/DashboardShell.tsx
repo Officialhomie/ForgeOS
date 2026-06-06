@@ -8,7 +8,22 @@ import { SubDelegationInitializer } from '@/components/SubDelegationInitializer'
 import { SubDelegationBanner } from '@/components/SubDelegationBanner'
 import { ExpiryRenewalBanner } from '@/components/ExpiryRenewalBanner'
 import { ForgeLogo } from '@/components/ui/ForgeLogo'
+import { isDemoMode } from '@/lib/demo'
 import { useEffect, useState, type ReactNode } from 'react'
+
+function DemoModeBanner() {
+  if (!isDemoMode()) return null
+  return (
+    <div className="flex items-center gap-2 border-b border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-xs text-yellow-400">
+      <span className="font-semibold uppercase tracking-wider">Demo mode</span>
+      <span className="text-yellow-400/70">—</span>
+      <span>
+        All balances, agents, and activity shown below are mock data.
+        Set <code className="font-mono">NEXT_PUBLIC_DEMO_MODE=false</code> and connect a real wallet to see live chain state.
+      </span>
+    </div>
+  )
+}
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   // Subscribe to 1Shot webhook events via SSE — replaces all polling
@@ -32,6 +47,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         <Sidebar />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
+        <DemoModeBanner />
         <TopBar onOpenNav={() => setNavOpen(true)} />
         <main className="flex-1 overflow-auto p-4 sm:p-6">
           <ExpiryRenewalBanner />

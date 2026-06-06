@@ -222,6 +222,7 @@ export function mapGraphActivity(node: GraphActivityEvent): ActivityEvent {
       : null,
     timestamp: Number(node.timestamp),
     status: 'confirmed',
+    source: 'subgraph',
   }
 }
 

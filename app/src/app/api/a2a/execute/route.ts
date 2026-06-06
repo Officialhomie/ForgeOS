@@ -129,6 +129,7 @@ export async function POST(request: Request) {
       delegationHash: subDelegationHash,
       timestamp: Math.floor(Date.now() / 1000),
       status: 'pending',
+      source: 'local',
     }
     activityEmitter.emitActivity(pendingActivity)
 

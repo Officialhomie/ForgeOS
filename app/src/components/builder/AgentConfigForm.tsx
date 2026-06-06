@@ -39,7 +39,6 @@ export function AgentConfigForm({
         {Object.entries(template.configSchema).map(([key, field]) => (
           <FormField
             key={key}
-            fieldKey={key}
             field={field}
             value={values[key]}
             onChange={(v) => handleField(key, v)}
@@ -121,12 +120,10 @@ export function AgentConfigForm({
 // ─── FIELD RENDERER ───────────────────────────────────────────────────────────
 
 function FormField({
-  fieldKey,
   field,
   value,
   onChange,
 }: {
-  fieldKey: string
   field: ConfigField
   value: string | number | boolean | undefined
   onChange: (v: string | number | boolean) => void

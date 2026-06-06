@@ -22,7 +22,6 @@ export function StepOne_Connect() {
     phase,
     error,
     isForgeChain,
-    chainId,
   } = useActivationContext()
 
   const busy = connectPending || phase === 'connecting'
@@ -71,7 +70,7 @@ export function StepOne_Connect() {
 
         {isConnected && !isForgeChain && (
           <p className="rounded-lg border border-forge-warning/40 bg-forge-warning/10 px-3 py-2 text-xs text-forge-warning">
-            You're on the wrong network. Please approve switching to Ethereum Sepolia in MetaMask to continue.
+            You&apos;re on the wrong network. Please approve switching to Ethereum Sepolia in MetaMask to continue.
           </p>
         )}
 

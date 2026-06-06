@@ -301,6 +301,7 @@ export const MOCK_ACTIVITY: ActivityEvent[] = [
     delegationHash: '0xDEFI0000000000000000000000000000000000000000000000000000000000001' as `0x${string}`,
     timestamp: NOW - 7200,
     status: 'confirmed',
+    source: 'local',
   },
   {
     id: 'act_002',
@@ -313,6 +314,7 @@ export const MOCK_ACTIVITY: ActivityEvent[] = [
     delegationHash: '0xPAY00000000000000000000000000000000000000000000000000000000000001' as `0x${string}`,
     timestamp: NOW - 86400,
     status: 'confirmed',
+    source: 'local',
   },
   {
     id: 'act_003',
@@ -325,6 +327,7 @@ export const MOCK_ACTIVITY: ActivityEvent[] = [
     delegationHash: '0xREDEL000000000000000000000000000000000000000000000000000000000001' as `0x${string}`,
     timestamp: NOW - 172800,
     status: 'confirmed',
+    source: 'local',
   },
   {
     id: 'act_004',
@@ -337,6 +340,7 @@ export const MOCK_ACTIVITY: ActivityEvent[] = [
     delegationHash: '0xROOT0000000000000000000000000000000000000000000000000000000000001' as `0x${string}`,
     timestamp: T_INSTALLED,
     status: 'confirmed',
+    source: 'local',
   },
 ]
 

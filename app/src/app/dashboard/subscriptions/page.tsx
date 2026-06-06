@@ -300,8 +300,8 @@ export default function SubscriptionsPage() {
   }
 
   async function handleCancel(sub: SubscriptionDisplay) {
-    // Revoke the delegation — in live mode this calls the delegation revoke endpoint
-    await fetch('/api/delegations/revoke', {
+    // Revoke the delegation via the relay — submits OSKernel.revokeOne on-chain.
+    await fetch('/api/relay/revoke', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ delegationHash: sub.delegation.hash }),

@@ -56,7 +56,7 @@ contract AgentTreasuryTest is Test {
         bytes memory proof = abi.encode(delegationHash);
 
         vm.prank(owner);
-        treasury.executePayment(address(venice), amount, agentId, proof);
+        treasury.executePayment(address(venice), amount, agentId, proof, owner);
 
         assertEq(treasury.getAgentSpend(agentId), amount);
         assertEq(treasury.refillPool(), (amount * 1500) / 10_000);
@@ -68,6 +68,6 @@ contract AgentTreasuryTest is Test {
 
         vm.prank(owner);
         vm.expectRevert(IAgentTreasury.InvalidDelegationProof.selector);
-        treasury.executePayment(address(venice), 10e6, agentId, proof);
+        treasury.executePayment(address(venice), 10e6, agentId, proof, owner);
     }
 }

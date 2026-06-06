@@ -7,8 +7,7 @@ import { useCommandStore } from '@/stores/command.store'
 import { useCommandBar } from '@/hooks/useCommandBar'
 import { useAgentExecute } from '@/hooks/useAgentExecute'
 import { Button } from '@/components/ui/Button'
-import { cn, formatUsdc, explorerTxUrl } from '@/lib/utils'
-import { ONESHOT } from '@/lib/constants'
+import { cn, formatUsdc } from '@/lib/utils'
 import type { ActionPlan, FlowTiming } from '@/types'
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -351,18 +350,6 @@ function deserialisePlan(p: SerialisedPlan): ActionPlan {
     actions: p.actions.map((a) => ({
       ...a,
       value: BigInt(a.value),
-    })),
-  }
-}
-
-function serialisePlan(plan: ActionPlan): SerialisedPlan {
-  return {
-    ...plan,
-    estimatedCost: plan.estimatedCost.toString(),
-    estimatedGas: plan.estimatedGas.toString(),
-    actions: plan.actions.map((a) => ({
-      ...a,
-      value: a.value.toString(),
     })),
   }
 }

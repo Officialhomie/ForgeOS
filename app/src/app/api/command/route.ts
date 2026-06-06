@@ -123,17 +123,20 @@ export async function POST(request: Request) {
         // Non-critical — embeddings failure must not break command flow
       })
 
+    // Emit 'pending' — plan has been generated but no transaction has been submitted yet.
+    // The status transitions to 'confirmed' only after the 1Shot webhook callback arrives.
     const activity: ActivityEvent = {
       id: `cmd_${plan.id}`,
       type: 'command_executed',
       agentId: null,
-      title: 'Command received',
+      title: 'Plan ready',
       description: plan.summary,
       amount: plan.estimatedCost,
       txHash: null,
       delegationHash: null,
       timestamp: Math.floor(Date.now() / 1000),
-      status: 'confirmed',
+      status: 'pending',
+      source: 'local',
     }
     activityEmitter.emitActivity(activity)
 

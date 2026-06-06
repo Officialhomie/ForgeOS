@@ -1,4 +1,6 @@
 import { ImageResponse } from 'next/og'
+import { ForgeMarkOg } from '@/lib/brand/forge-mark-og'
+import { FORGE_BRAND } from '@/lib/brand/tokens'
 
 export const runtime = 'edge'
 export const alt = 'ForgeOS — Run AI agents with spending limits you control'
@@ -16,14 +18,13 @@ export default function TwitterImage() {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          backgroundColor: '#09090b',
+          backgroundColor: FORGE_BRAND.background,
           fontFamily: 'system-ui, -apple-system, sans-serif',
           padding: '0 80px',
           position: 'relative',
           overflow: 'hidden',
         }}
       >
-        {/* Background subtle grid */}
         <div
           style={{
             position: 'absolute',
@@ -33,34 +34,45 @@ export default function TwitterImage() {
             backgroundSize: '50px 50px',
           }}
         />
-
-        {/* Left: text content */}
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, zIndex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 32 }}>
-            {/* Mini mark */}
-            <svg viewBox="0 0 40 40" width={56} height={56}>
-              <rect x="0" y="0" width="40" height="40" rx="9" fill="#18181b" />
-              <rect x="0.5" y="0.5" width="39" height="39" rx="8.75" stroke="#f97316" strokeWidth="1" strokeOpacity="0.5" />
-              <rect x="11" y="10" width="4.5" height="20" rx="2.25" fill="#f97316" />
-              <rect x="11" y="10" width="14.5" height="4.5" rx="2.25" fill="#f97316" />
-              <rect x="11" y="18.75" width="10.5" height="3.75" rx="1.875" fill="#f97316" />
-              <circle cx="28" cy="12.25" r="2.75" fill="#fb923c" />
-            </svg>
-            <span style={{ fontSize: 22, fontWeight: 600, color: '#71717a', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            <ForgeMarkOg width={56} height={56} gradientId="tw-fg" />
+            <span
+              style={{
+                fontSize: 22,
+                fontWeight: 600,
+                color: '#71717a',
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+              }}
+            >
               ForgeOS
             </span>
           </div>
-
           <div style={{ display: 'flex', marginBottom: 20 }}>
-            <span style={{ fontSize: 56, fontWeight: 700, color: '#fafafa', letterSpacing: '-0.03em', lineHeight: 1.1 }}>
+            <span
+              style={{
+                fontSize: 56,
+                fontWeight: 700,
+                color: FORGE_BRAND.text,
+                letterSpacing: '-0.03em',
+                lineHeight: 1.1,
+              }}
+            >
               AI agents that work for you.
             </span>
           </div>
-
-          <p style={{ fontSize: 22, color: '#a1a1aa', margin: 0, maxWidth: 520, lineHeight: 1.5 }}>
+          <p
+            style={{
+              fontSize: 22,
+              color: FORGE_BRAND.textMuted,
+              margin: 0,
+              maxWidth: 520,
+              lineHeight: 1.5,
+            }}
+          >
             Spending limits, granular permissions, zero-knowledge control.
           </p>
-
           <div style={{ display: 'flex', gap: 10, marginTop: 36 }}>
             {['ERC-4337', 'Venice AI', 'x402'].map((tag) => (
               <span
@@ -68,7 +80,7 @@ export default function TwitterImage() {
                 style={{
                   fontSize: 14,
                   fontWeight: 500,
-                  color: '#f97316',
+                  color: FORGE_BRAND.orange,
                   backgroundColor: 'rgba(249,115,22,0.1)',
                   border: '1px solid rgba(249,115,22,0.3)',
                   borderRadius: 6,
@@ -80,8 +92,6 @@ export default function TwitterImage() {
             ))}
           </div>
         </div>
-
-        {/* Right: large mark */}
         <div
           style={{
             display: 'flex',
@@ -92,12 +102,7 @@ export default function TwitterImage() {
             marginLeft: 40,
           }}
         >
-          <svg viewBox="0 0 40 40" width={280} height={280}>
-            <rect x="11" y="10" width="4.5" height="20" rx="2.25" fill="#f97316" />
-            <rect x="11" y="10" width="14.5" height="4.5" rx="2.25" fill="#f97316" />
-            <rect x="11" y="18.75" width="10.5" height="3.75" rx="1.875" fill="#f97316" />
-            <circle cx="28" cy="12.25" r="2.75" fill="#fb923c" />
-          </svg>
+          <ForgeMarkOg width={280} height={280} gradientId="tw-bg" showContainer={false} />
         </div>
       </div>
     ),

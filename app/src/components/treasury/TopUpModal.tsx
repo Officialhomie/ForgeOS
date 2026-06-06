@@ -10,7 +10,6 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { CONTRACTS } from '@/lib/contracts'
-import { forgeChain } from '@/lib/wagmi/chains'
 import { ONESHOT } from '@/lib/constants'
 import { Coins, X } from 'lucide-react'
 

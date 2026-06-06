@@ -11,7 +11,7 @@ export function ZustandHydration({ children }: { children: ReactNode }) {
   useEffect(() => {
     ensureStorageContractVersion()
     hydrateDemoStores()
-    setReady(true)
+    queueMicrotask(() => setReady(true))
   }, [])
 
   if (!ready) {

@@ -86,7 +86,7 @@ function buildInstalledAgent(
     description: agent.metadata?.description ?? '',
     icon: '🤖',
     category: (agent.metadata?.category as AgentCategory | undefined) ?? 'data',
-    status: 'active',
+    status: 'pending',
     installedAt: Math.floor(Date.now() / 1000),
     lastRunAt: null,
     nextRunAt: null,
@@ -140,7 +140,9 @@ export function useMarketplace(): UseMarketplaceReturn {
   }, [])
 
   useEffect(() => {
-    void fetchAgents()
+    queueMicrotask(() => {
+      void fetchAgents()
+    })
   }, [fetchAgents])
 
   const installAgent = useCallback(
@@ -239,17 +241,38 @@ export function useMarketplace(): UseMarketplaceReturn {
           useOsStore.getState().setRootDelegation(delegation)
         }
 
+        // Add as 'pending' until the delegation bundle is confirmed server-side.
         const stubAgent = buildInstalledAgent(agent, delegation)
-        useAgentsStore.getState().addInstalledAgent(agentId as AgentId, stubAgent)
+        useAgentsStore.getState().addInstalledAgent(agentId as AgentId, { ...stubAgent, status: 'pending' })
 
-        void fetch('/api/delegations/bundle', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            smartAccountAddress: address,
-            delegations: [delegation],
-          }),
-        })
+        let bundleOk = false
+        try {
+          const bundleRes = await fetch('/api/delegations/bundle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              smartAccountAddress: address,
+              delegations: [delegation],
+            }),
+          })
+          if (bundleRes.ok) {
+            // Bundle accepted — delegation proof is server-registered, mark active.
+            useAgentsStore.getState().addInstalledAgent(agentId as AgentId, {
+              ...stubAgent,
+              status: 'active',
+            })
+            bundleOk = true
+          }
+        } catch {
+          // Network error — agent stays 'pending' in local store.
+        }
+
+        if (!bundleOk) {
+          return {
+            success: false,
+            error: 'Delegation bundle registration failed. Agent is pending — retry from the agent page.',
+          }
+        }
 
         return { success: true }
       } catch (e) {

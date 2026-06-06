@@ -63,9 +63,19 @@ export async function POST(request: Request) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'redelegate relay failed'
     if (isOneShotUnavailableError(msg)) {
-      // 1Shot has no payment tokens on this chain (expected on Sepolia).
-      // The delegation is created locally — skip the on-chain relay gracefully.
-      return NextResponse.json({ success: true, taskId: 'relay-unavailable', delegationHash: delegation.hash })
+      // 1Shot has no payment tokens on this chain (e.g. Sepolia).
+      // The delegation struct exists locally but was NOT submitted on-chain.
+      // Callers must treat this as relay-skipped, not as confirmed.
+      return NextResponse.json(
+        {
+          success: false,
+          code: 'RELAY_UNAVAILABLE',
+          relaySkipped: true,
+          delegationHash: delegation.hash,
+          error: 'Relay unavailable on this chain — delegation is local-only and not yet on-chain',
+        },
+        { status: 503 },
+      )
     }
     return NextResponse.json({ success: false, error: msg }, { status: 500 })
   }

@@ -1,4 +1,4 @@
-import { encodeFunctionData, parseUnits, type Address, type Hex } from 'viem'
+import { encodeFunctionData, parseUnits, type Hex } from 'viem'
 import type { Delegation } from '@/types'
 import { delegationTupleForEncoding } from '@/lib/delegation/normalize-for-encoding'
 import type { UserOp } from '@/services/execution-engine/userop-builder'

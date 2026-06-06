@@ -25,8 +25,6 @@ import {
   getPendingPublishedAgents,
   mergeAgentsWithPending,
   readAgentEndpoint,
-  REGISTRY_ADDRESS,
-  REGISTRY_READ_ABI,
   resolveListingFromBlock,
   setCachedAgents,
 } from '@/lib/registry/registry-logs'
@@ -45,9 +43,7 @@ type MarketplaceAgentRow = {
   txHash: `0x${string}` | null
 }
 
-async function agentsFromSubgraph(
-  _client: ReturnType<typeof createPublicClient>,
-): Promise<MarketplaceAgentRow[] | null> {
+async function agentsFromSubgraph(): Promise<MarketplaceAgentRow[] | null> {
   if (!isGraphEnabled()) return null
   try {
     const data = await queryGraph<{
@@ -155,7 +151,7 @@ async function refreshCacheBackground(client: PublicClient): Promise<void> {
   if (isRefreshing) return
   isRefreshing = true
   try {
-    const fromGraph = await agentsFromSubgraph(client)
+    const fromGraph = await agentsFromSubgraph()
     const onChain: MarketplaceAgentRow[] = fromGraph ?? await agentsFromRpcSafe(client)
     const withPending = mergeAgentsWithPending(onChain, getPendingPublishedAgents())
     if (withPending.length > 0) setCachedAgents(withPending)
@@ -208,7 +204,7 @@ export async function GET(request: Request) {
 
     const forceFullScan = url.searchParams.get('refresh') === '1'
 
-    const fromGraph = await agentsFromSubgraph(client)
+    const fromGraph = await agentsFromSubgraph()
     // fromGraph === null  → subgraph query failed → fall to RPC (expensive)
     // fromGraph === []    → subgraph healthy, 0 agents indexed yet → trust it
     // fromGraph.length>0  → use subgraph data

@@ -18,7 +18,6 @@ import { send7710Transaction } from '@/lib/oneshot/client'
 import { taskStore } from '@/lib/oneshot/task-store'
 import { activityEmitter } from '@/lib/events/activity-emitter'
 import { APP_URL, ONESHOT } from '@/lib/constants'
-import { CONTRACTS } from '@/lib/contracts'
 import type { Address, ActivityEvent, Subscription } from '@/types'
 
 // ─── REQUEST BODY ─────────────────────────────────────────────────────────────
@@ -123,6 +122,7 @@ export async function POST(request: Request) {
       delegationHash: hash,
       timestamp: Math.floor(Date.now() / 1000),
       status: 'pending',
+      source: 'local',
     }
     activityEmitter.emitActivity(activity)
 

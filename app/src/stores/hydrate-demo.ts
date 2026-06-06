@@ -13,6 +13,14 @@ import { useOsStore } from '@/stores/os.store'
 
 export function hydrateDemoStores(): void {
   if (!isDemoMode()) return
+  // Hard guard: mock data must never reach a production deployment.
+  if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
+    console.error(
+      '[ForgeOS] NEXT_PUBLIC_DEMO_MODE=true is set in a production build. ' +
+      'Mock data will NOT be hydrated. Unset this variable before deploying.',
+    )
+    return
+  }
 
   useOsStore.getState().setOsStatus('active')
   useOsStore.getState().setRootDelegation(MOCK_DELEGATIONS.root)

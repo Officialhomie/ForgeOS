@@ -1,10 +1,20 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { useOsStore } from '@/stores/os.store'
 
 export function ExpiryRenewalBanner() {
   const root = useOsStore((s) => s.rootDelegation)
+  const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000))
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setNowSeconds(Math.floor(Date.now() / 1000))
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [])
+
   if (!root) return null
 
   const expiryCaveat = root.caveats.find((c) =>
@@ -17,8 +27,9 @@ export function ExpiryRenewalBanner() {
       ? Number((expiryCaveat.decodedTerms as { expiry: number }).expiry)
       : null
 
-  if (!expiry) return null
-  const daysLeft = Math.floor((expiry - Date.now() / 1000) / 86400)
+  const daysLeft = expiry ? Math.floor((expiry - nowSeconds) / 86400) : null
+
+  if (daysLeft === null) return null
   if (daysLeft > 30) return null
 
   return (

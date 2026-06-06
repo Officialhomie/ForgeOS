@@ -5,38 +5,82 @@ import { useAccount } from 'wagmi'
 import { useOsStore } from '@/stores/os.store'
 import { useDelegationsStore } from '@/stores/delegations.store'
 import { createOSSubDelegations } from '@/lib/delegation/auto-delegate'
-import { ONCHAIN_DELEGATION_MARKER } from '@/lib/delegation/proof-bundle'
+import { RELAY_SUBMITTED_MARKER } from '@/lib/delegation/proof-bundle'
 import { useActivationStore } from '@/stores/activation.store'
 import type { Delegation, Hash } from '@/types'
 
 export interface SubDelegationsState {
   subDelegationHash: Hash | null
   reDelegationHash: Hash | null
+  /** True when both delegations are set (local or relay-submitted). */
   ready: boolean
+  /**
+   * True when relay was unavailable and the delegation chain was NOT submitted on-chain.
+   * The delegations exist locally but have not been registered in OSKernel.
+   */
+  relaySkipped: boolean
   error: string | null
   loading: boolean
 }
 
+interface RedelegateResponse {
+  success: boolean
+  taskId?: string
+  code?: string
+  relaySkipped?: boolean
+  delegationHash?: string
+  error?: string
+}
+
+/**
+ * Returns the relay taskId when the relay accepted the transaction,
+ * or null when the relay is unavailable on this chain (Sepolia).
+ * Throws on unexpected errors.
+ */
 async function relayRedelegate(
   parentHash: Hash,
   delegation: Delegation,
-): Promise<string> {
+): Promise<string | null> {
   const res = await fetch('/api/relay/redelegate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parentHash, delegation }),
   })
-  const data = (await res.json()) as { success: boolean; taskId?: string; error?: string }
-  if (!data.success || !data.taskId) {
+  const data = (await res.json()) as RedelegateResponse
+  if (!data.success) {
+    if (data.code === 'RELAY_UNAVAILABLE') {
+      // Chain has no relay payment tokens — delegation is local-only.
+      return null
+    }
     throw new Error(data.error ?? 'redelegate relay failed')
+  }
+  if (!data.taskId) {
+    throw new Error('redelegate relay returned no taskId')
   }
   return data.taskId
 }
 
-function markOnChainConfirmed(d: Delegation): Delegation {
+/**
+ * Marks a delegation as relay-submitted (pending on-chain inclusion).
+ * Uses RELAY_SUBMITTED_MARKER — distinct from ONCHAIN_DELEGATION_MARKER which
+ * is only set after webhook confirmation of on-chain inclusion.
+ */
+function markRelayAccepted(d: Delegation): Delegation {
   return {
     ...d,
-    signature: ONCHAIN_DELEGATION_MARKER,
+    signature: RELAY_SUBMITTED_MARKER,
+    status: 'active',
+  }
+}
+
+/**
+ * Marks a delegation as relay-skipped: the struct is valid locally but was
+ * never submitted to the chain. Status stays 'active' for local use, but
+ * the signature is NOT the relay-submitted or on-chain marker.
+ */
+function markRelaySkipped(d: Delegation): Delegation {
+  return {
+    ...d,
     status: 'active',
   }
 }
@@ -54,6 +98,7 @@ export function useSubDelegations(): SubDelegationsState {
   const creating = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [relaySkipped, setRelaySkipped] = useState(false)
 
   useEffect(() => {
     if (!rootDelegation) return
@@ -64,13 +109,17 @@ export function useSubDelegations(): SubDelegationsState {
     const paymentAgentAddress = process.env.NEXT_PUBLIC_PAYMENT_AGENT_ADDRESS
 
     if (!defiAgentAddress || !paymentAgentAddress) {
-      setError('Set NEXT_PUBLIC_DEFI_AGENT_ADDRESS and NEXT_PUBLIC_PAYMENT_AGENT_ADDRESS')
+      queueMicrotask(() =>
+        setError('Set NEXT_PUBLIC_DEFI_AGENT_ADDRESS and NEXT_PUBLIC_PAYMENT_AGENT_ADDRESS'),
+      )
       return
     }
 
     creating.current = true
-    setLoading(true)
-    setError(null)
+    queueMicrotask(() => {
+      setLoading(true)
+      setError(null)
+    })
 
     createOSSubDelegations(
       rootDelegation,
@@ -78,13 +127,18 @@ export function useSubDelegations(): SubDelegationsState {
       paymentAgentAddress as `0x${string}`,
     )
       .then(async ({ subDelegation: sub, reDelegation: re }) => {
-        await relayRedelegate(rootDelegation.hash, sub)
-        const subConfirmed = markOnChainConfirmed(sub)
+        const subTaskId = await relayRedelegate(rootDelegation.hash, sub)
+        const subConfirmed = subTaskId ? markRelayAccepted(sub) : markRelaySkipped(sub)
         setSubDelegation(subConfirmed)
 
-        await relayRedelegate(sub.hash, re)
-        const reConfirmed = markOnChainConfirmed(re)
+        const reTaskId = await relayRedelegate(sub.hash, re)
+        const reConfirmed = reTaskId ? markRelayAccepted(re) : markRelaySkipped(re)
         setReDelegation(reConfirmed)
+
+        // Track whether relay was available for either delegation.
+        if (!subTaskId || !reTaskId) {
+          setRelaySkipped(true)
+        }
 
         const all = [
           rootDelegation,
@@ -127,6 +181,7 @@ export function useSubDelegations(): SubDelegationsState {
     subDelegationHash: subDelegation?.hash ?? null,
     reDelegationHash: reDelegation?.hash ?? null,
     ready: !!(subDelegation && reDelegation),
+    relaySkipped,
     error,
     loading,
   }

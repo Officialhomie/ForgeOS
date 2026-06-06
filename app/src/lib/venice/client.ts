@@ -398,9 +398,8 @@ export class VeniceClient {
     if (this.apiKey || !this.account) {
       throw new Error('Venice client is in API key mode — wallet balance check unavailable')
     }
-    const token = CONTRACTS.usdcBase as Address
     const [usdcBaseUnits, ethWei, venice] = await Promise.all([
-      this.readAgentUsdcOnBase(token),
+      this.readAgentUsdcOnBase(CONTRACTS.usdcBase as Address),
       createPublicClient({
         chain: veniceChain,
         transport: http(
@@ -412,7 +411,7 @@ export class VeniceClient {
     return {
       address: this.account.address,
       chainId: VENICE_CHAIN_ID,
-      usdcContract: token,
+      usdcContract: CONTRACTS.usdcBase as Address,
       baseUsdc: formatUsdcBaseUnits(usdcBaseUnits),
       baseUsdcBaseUnits: usdcBaseUnits.toString(),
       baseEth: formatUnits(ethWei, 18),
@@ -441,7 +440,7 @@ export class VeniceClient {
     }
   }
 
-  private async assertAgentUsdcForTopUp(required: bigint, token: Address): Promise<void> {
+  private async assertAgentUsdcForTopUp(required: bigint): Promise<void> {
     const snapshot = await this.getFundingSnapshot()
     const available = BigInt(snapshot.baseUsdcBaseUnits)
     const ethWei = await createPublicClient({
@@ -479,7 +478,7 @@ export class VeniceClient {
     }
     const { payTo, maxAmountRequired, asset } = normalizeX402Offer(raw)
     const amount = BigInt(maxAmountRequired)
-    await this.assertAgentUsdcForTopUp(amount, asset as Address)
+    await this.assertAgentUsdcForTopUp(amount)
 
     let txHash: `0x${string}`
     try {
@@ -591,7 +590,7 @@ export class VeniceClient {
             required = BigInt(Math.ceil(hint.minimumUsd * 1_000_000))
           }
         }
-        await this.assertAgentUsdcForTopUp(required, CONTRACTS.usdcBase as Address)
+        await this.assertAgentUsdcForTopUp(required)
         await this.topUp(required)
         return this.request(path, body, { retried: true })
       }
@@ -655,7 +654,7 @@ export class VeniceClient {
   ): Promise<ActionPlan> {
     const systemPrompt = buildSystemPrompt(context)
 
-    const { completion, promptTokens, completionTokens } = await this.chat({
+    const { completion } = await this.chat({
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: intent },

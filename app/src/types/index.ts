@@ -67,7 +67,7 @@ export interface DelegationRequest {
 
 // ─── AGENT ────────────────────────────────────────────────────────────────────
 
-export type AgentStatus = 'active' | 'paused' | 'inactive' | 'running' | 'failed'
+export type AgentStatus = 'active' | 'paused' | 'inactive' | 'running' | 'failed' | 'pending'
 
 export type AgentId =
   | 'defi-rebalancer'
@@ -274,7 +274,8 @@ export interface InferenceCostRecord {
 // ─── ACTIVITY FEED ────────────────────────────────────────────────────────────
 
 export type ActivityEventType =
-  | 'agent_run_confirmed'
+  | 'agent_run_submitted'  // relay accepted — pending on-chain inclusion
+  | 'agent_run_confirmed'  // on-chain confirmed (from webhook or subgraph)
   | 'agent_run_failed'
   | 'delegation_issued'
   | 'delegation_revoked'
@@ -284,6 +285,13 @@ export type ActivityEventType =
   | 'os_revoked'
   | 'command_executed'
   | 'kill_switch_failed'
+
+/** Where the evidence backing this event came from. */
+export type ActivityEventSource =
+  | 'webhook'    // confirmed by 1Shot webhook callback — most trusted
+  | 'rpc'        // from a direct on-chain RPC read
+  | 'subgraph'   // from the subgraph indexer
+  | 'local'      // optimistic client-side event; no on-chain evidence yet
 
 export interface ActivityEvent {
   id: string
@@ -297,6 +305,8 @@ export interface ActivityEvent {
   taskId?: string | null
   timestamp: number
   status: 'confirmed' | 'pending' | 'failed'
+  /** Evidence source — always present; use to judge how trustworthy the status is. */
+  source: ActivityEventSource
 }
 
 // ─── COMMAND / VENICE ─────────────────────────────────────────────────────────

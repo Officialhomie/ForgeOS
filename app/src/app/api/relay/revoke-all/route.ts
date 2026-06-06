@@ -1,14 +1,16 @@
 /**
- * POST /api/relay/revoke-all — OSKernel.revokeAll() via 1Shot.
+ * POST /api/relay/revoke-all — OSKernel.revokeAll() via owner-signed RPC transaction.
+ *
+ * Requires FORGE_OWNER_KEY: the private key of the address that owns the deployed OSKernel.
+ * Owner operations cannot go through the ERC-7710 relay (which requires delegation proofs).
+ * The relay model is for delegation-authorized execution; revoke is an owner-only operation.
  */
 
 import { NextResponse } from 'next/server'
-import { encodeFunctionData } from 'viem'
-import { send7710Transaction } from '@/lib/oneshot/client'
-import { taskStore } from '@/lib/oneshot/task-store'
+import { createWalletClient, http } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
+import { sepolia } from 'viem/chains'
 import { activityEmitter } from '@/lib/events/activity-emitter'
-import { registerKillSwitchTask } from '@/lib/kill-switch/registry'
-import { APP_URL, ONESHOT } from '@/lib/constants'
 import { CONTRACTS } from '@/lib/contracts'
 import type { ActivityEvent, Delegation } from '@/types'
 
@@ -23,8 +25,18 @@ const OS_KERNEL_ABI = [
 ] as const
 
 export async function POST(request: Request) {
-  if (!process.env.ONESHOT_API_KEY) {
-    return NextResponse.json({ success: false, error: 'ONESHOT_API_KEY not configured' }, { status: 503 })
+  const ownerKey = process.env.FORGE_OWNER_KEY
+  if (!ownerKey) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          'FORGE_OWNER_KEY not configured. OSKernel.revokeAll() is onlyOwner — ' +
+          'set FORGE_OWNER_KEY to the private key of the OSKernel contract owner.',
+        code: 'OWNER_KEY_REQUIRED',
+      },
+      { status: 503 },
+    )
   }
 
   let delegations: Delegation[] = []
@@ -38,50 +50,44 @@ export async function POST(request: Request) {
   const kernelAddress = CONTRACTS.osKernel
 
   try {
-    const callData = encodeFunctionData({
+    const account = privateKeyToAccount(ownerKey as `0x${string}`)
+    const rpcUrl =
+      process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL ??
+      process.env.NEXT_PUBLIC_RPC_URL ??
+      'https://rpc.ankr.com/eth_sepolia'
+
+    const walletClient = createWalletClient({
+      account,
+      chain: sepolia,
+      transport: http(rpcUrl),
+    })
+
+    const txHash = await walletClient.writeContract({
+      account,
+      address: kernelAddress,
       abi: OS_KERNEL_ABI,
       functionName: 'revokeAll',
     })
 
-    const webhookUrl = process.env.ONESHOT_WEBHOOK_URL ?? `${APP_URL}/api/webhooks/1shot`
-
-    const { taskId } = await send7710Transaction({
-      chainId: ONESHOT.CHAIN_ID,
-      userOps: [
-        {
-          sender: kernelAddress,
-          callData,
-          target: kernelAddress,
-          value: '0',
-          nonce: 0,
-        },
-      ],
-      destinationUrl: webhookUrl,
-    })
-
-    taskStore.create(taskId)
-    if (delegations.length > 0) {
-      registerKillSwitchTask(taskId, delegations)
-    }
-
     const pendingEvent: ActivityEvent = {
-      id: `kill_switch_${taskId}`,
+      id: `kill_switch_${txHash}`,
       type: 'os_revoked',
       agentId: null,
       title: 'Kill switch activated',
-      description: `OSKernel.revokeAll() submitted`,
+      description: `OSKernel.revokeAll() submitted — ${delegations.length} delegation(s)`,
       amount: null,
-      txHash: null,
+      txHash,
       delegationHash: null,
-      taskId,
+      taskId: null,
       timestamp: Math.floor(Date.now() / 1000),
       status: 'pending',
+      source: 'rpc',
     }
     activityEmitter.emitActivity(pendingEvent)
 
-    return NextResponse.json({ success: true, taskId })
+    return NextResponse.json({ success: true, txHash })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'revokeAll relay error'
+    const msg = e instanceof Error ? e.message : 'revokeAll failed'
     return NextResponse.json({ success: false, error: msg }, { status: 500 })
   }
 }

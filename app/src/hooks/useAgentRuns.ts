@@ -5,7 +5,8 @@ import type { AgentId, AgentRun } from '@/types'
 
 const PAGE_SIZE = 5
 
-export function useAgentRuns(agentId: AgentId) {
+export function useAgentRuns(_agentId: AgentId) {
+  void _agentId
   const [page, setPage] = useState(0)
 
   // Run history is populated via the activity stream (SSE) in live mode.

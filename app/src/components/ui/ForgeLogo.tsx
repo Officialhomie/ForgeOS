@@ -1,3 +1,4 @@
+import { FORGE_BRAND } from '@/lib/brand/tokens'
 import { cn } from '@/lib/utils'
 import { ForgeMark } from './ForgeMark'
 
@@ -18,7 +19,7 @@ export function ForgeLogo({
   variant = 'dark',
 }: ForgeLogoProps) {
   const textSize = Math.round(markSize * 0.5)
-  const textColor = variant === 'dark' ? '#fafafa' : '#09090b'
+  const textColor = variant === 'dark' ? FORGE_BRAND.text : FORGE_BRAND.background
 
   if (markOnly) {
     return <ForgeMark size={markSize} className={className} />
@@ -31,7 +32,7 @@ export function ForgeLogo({
         className="font-bold tracking-tight leading-none select-none"
         style={{ fontSize: textSize, color: textColor }}
       >
-        Forge<span style={{ color: '#f97316' }}>OS</span>
+        Forge<span style={{ color: FORGE_BRAND.orange }}>OS</span>
       </span>
     </div>
   )

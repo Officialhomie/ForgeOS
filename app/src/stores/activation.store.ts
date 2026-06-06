@@ -15,6 +15,12 @@ export interface WalletActivationState {
   deployTxHash: Hash | null
   fundTxHash: Hash | null
   oneShotTaskId: string | null
+  /**
+   * True when the 1Shot relay was unavailable during the permissions step.
+   * The root delegation was signed locally but NOT submitted on-chain.
+   * On-chain execution requires relay availability.
+   */
+  relayUnavailable: boolean
 }
 
 export const INITIAL_WALLET: WalletActivationState = {
@@ -25,6 +31,7 @@ export const INITIAL_WALLET: WalletActivationState = {
   deployTxHash: null,
   fundTxHash: null,
   oneShotTaskId: null,
+  relayUnavailable: false,
 }
 
 // ─── Store shape ───────────────────────────────────────────────────────────

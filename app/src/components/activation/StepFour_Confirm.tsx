@@ -30,6 +30,7 @@ export function StepFour_Confirm() {
     isForgeChain,
     fundTxHash,
     error,
+    relayUnavailable,
   } = useActivationContext()
 
   const gated = !canProceed('fund')
@@ -74,8 +75,16 @@ export function StepFour_Confirm() {
         )}
 
         <p className="rounded-lg border border-forge-info/30 bg-forge-info/10 px-3 py-2 text-xs text-forge-text-muted">
-          You'll need a small amount of Sepolia USDC in your wallet to continue. This is what your agents will spend when they take actions.
+          You&apos;ll need a small amount of Sepolia USDC in your wallet to continue. This is what your agents will spend when they take actions.
         </p>
+
+        {relayUnavailable && (
+          <p className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
+            The 1Shot relay was unavailable when you set permissions. Your root delegation is
+            stored locally but has not been registered on-chain. Agent execution requires
+            relay availability — this will resolve automatically when the relay comes online.
+          </p>
+        )}
 
         <label className="block space-y-1">
           <span className="text-xs text-forge-text-muted">USDC amount</span>

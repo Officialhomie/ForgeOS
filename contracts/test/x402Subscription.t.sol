@@ -83,7 +83,7 @@ contract x402SubscriptionTest is Test {
         for (uint256 i = 0; i < 3; ++i) {
             vm.warp(block.timestamp + 1 hours);
             vm.prank(owner);
-            treasury.executePayment(address(venice), cycleAmount, agentId, proof);
+            treasury.executePayment(address(venice), cycleAmount, agentId, proof, owner);
         }
 
         assertEq(treasury.getAgentSpend(agentId), 30e6);

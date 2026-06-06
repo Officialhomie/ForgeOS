@@ -103,7 +103,7 @@ export function useActivation() {
     address ? (s.wallets[address.toLowerCase()] ?? INITIAL_WALLET) : INITIAL_WALLET,
   )
 
-  const { phase, completedSteps, smartAccountAddress, deployTxHash, fundTxHash, oneShotTaskId } =
+  const { phase, completedSteps, smartAccountAddress, deployTxHash, fundTxHash, oneShotTaskId, relayUnavailable } =
     walletState
 
   // ─── Transient UI state (not persisted) ────────────────────────────────
@@ -139,14 +139,18 @@ export function useActivation() {
     if (!address) return
     const stored = useActivationStore.getState().getWallet(address)
     if (isStaleActivationState(stored)) {
-      useActivationStore.getState().resetWallet(address)
-      setOsStatus('inactive')
-      setKernel(null)
+      queueMicrotask(() => {
+        useActivationStore.getState().resetWallet(address)
+        setOsStatus('inactive')
+        setKernel(null)
+      })
       return
     }
     if (stored.phase === 'active') {
-      setOsStatus('active')
-      setActivationStep(4)
+      queueMicrotask(() => {
+        setOsStatus('active')
+        setActivationStep(4)
+      })
     }
   }, [address, setOsStatus, setActivationStep, setKernel])
 
@@ -251,11 +255,11 @@ export function useActivation() {
         await ensureForgeChain(switchChainAsync)
         markComplete('connect')
         patch({ phase: 'idle' })
-        setConnectPhase('idle')
+        queueMicrotask(() => setConnectPhase('idle'))
         setActivationStep(1)
       } catch (e) {
         patch({ phase: 'error' })
-        setConnectPhase('idle')
+        queueMicrotask(() => setConnectPhase('idle'))
         setError(formatWalletError(e))
       }
     })()
@@ -413,17 +417,22 @@ export function useActivation() {
         }),
       })
       const delegateData = (await delegateRes.json()) as { taskId?: string; error?: string }
+      let delegateRelayUnavailable = false
       if (!delegateRes.ok) {
         const relayError = delegateData.error ?? 'On-chain delegate relay failed'
         if (!isOneShotUnavailableError(relayError)) {
           throw new Error(relayError)
         }
+        // Relay is unavailable on this chain — delegation is local-only.
+        // Continue activation but surface the limitation in the UI.
+        delegateRelayUnavailable = true
       }
 
       patch({
         delegationHash: forgeDel.hash,
         oneShotTaskId: delegateData.taskId ?? null,
         phase: 'idle',
+        relayUnavailable: delegateRelayUnavailable,
       })
       markComplete('permissions')
       setActivationStep(3)
@@ -610,7 +619,7 @@ export function useActivation() {
   // ─── Reset entire activation for the current wallet ─────────────────────
   const resetActivation = useCallback(() => {
     if (address) useActivationStore.getState().resetWallet(address)
-    setConnectPhase('idle')
+    queueMicrotask(() => setConnectPhase('idle'))
     setError(null)
     setOsStatus('inactive')
     setRootDelegation(null)
@@ -624,8 +633,10 @@ export function useActivation() {
   // wallet, they resume where they left off. Only reset transient local state.
   useEffect(() => {
     if (walletStatus !== 'disconnected') return
-    setConnectPhase('idle')
-    setError(null)
+    queueMicrotask(() => {
+      setConnectPhase('idle')
+      setError(null)
+    })
   }, [walletStatus])
 
   // ─── Go back one step ───────────────────────────────────────────────────
@@ -677,6 +688,7 @@ export function useActivation() {
     deployTxHash,
     fundTxHash,
     oneShotTaskId,
+    relayUnavailable,
     fundAmountUsdc,
     setFundAmountUsdc,
     connectWallet,

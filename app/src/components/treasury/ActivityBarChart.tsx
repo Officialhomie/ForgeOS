@@ -9,7 +9,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { formatUsdc } from '@/lib/utils'
 
 export function ActivityBarChart({
   dailySpend,

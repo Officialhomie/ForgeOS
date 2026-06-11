@@ -158,7 +158,7 @@ Per the ship prompt, Phase 2 requires a decision on whether to pursue live `rede
 |----|----------|------|-----|-------|
 | H1 | HIGH | `app/src/app/twitter-image.tsx:74` | Remove "zero-knowledge" claim | Phase 4 (Claims) |
 | H2 | HIGH | `app/src/lib/agents/templates.ts:50-55` | **FIXED 2026-06-10** — see Remediation Log | Phase 1 |
-| H3 | HIGH | `app/src/services/orchestrator/intent-parser.ts:181,198` | Guard against zero/null target address | Phase 1 |
+| H3 | HIGH | `app/src/services/orchestrator/intent-parser.ts:181,198` | **FIXED 2026-06-10** — see Remediation Log | Phase 1 |
 | H4 | HIGH | `README.md:132-140` | Update implementation status table | Phase 4 |
 | ENV1 | MEDIUM | `app/.env.example` | Add 5 missing env vars with comments | Phase 3 |
 | OC1 | MEDIUM | OSKernel on-chain owner | Verify owner == `FORGE_OWNER_KEY` wallet | Phase 3 pre-check |
@@ -215,3 +215,24 @@ enforcer placeholder usage exists (`createSubDelegation.ts` / `createSubscriptio
 take enforcer addresses from the smart-accounts-kit at runtime).
 
 `npx tsc --noEmit` and `pnpm build` clean after change.
+
+### H3 — FIXED (2026-06-10)
+
+Three changes:
+
+1. **Guard** — `assertValidActionTarget()` added to `app/src/lib/delegation/proof-validation.ts`,
+   called for every action at the top of `buildAndValidateUserOps()` (which runs first on all four
+   execution paths: `/api/execute`, `/api/a2a/execute`, `/api/agents/run`, `/api/registry/publish`).
+   Rejects missing, non-hex (unexpanded template tokens), zero-address, and placeholder
+   (`0x…0001`–`0x…0006`) targets with `DelegationProofError("action.target is missing or invalid …")`
+   → API returns 422. No invalid target can reach the 1Shot submission call.
+2. **Parser** — zero-address fallbacks at `intent-parser.ts:181,198` removed; a missing target now
+   stays visibly invalid (`'0x'`) and fails validation instead of being submitted to `0x0000…0000`.
+3. **Venice prompt** — example targets `0x…0001/0002` replaced with `<TARGET_CONTRACT_ADDRESS>`
+   template tokens plus an explicit rule: output a real checksummed address from context or omit
+   the action. The guard also rejects the literal token if echoed back.
+
+Evidence — `npx -y tsx scripts/test-target-guard.ts` (all 7 checks pass):
+missing target → 422-class error; `0x` → rejected; zero address → rejected; `0x…0001`/`0x…0002`
+→ rejected; `<TARGET_CONTRACT_ADDRESS>` → rejected; valid checksummed target (Sepolia USDC) → passes.
+`npx tsc --noEmit` and `pnpm build` clean.

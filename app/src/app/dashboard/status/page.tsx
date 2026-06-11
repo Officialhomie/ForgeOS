@@ -28,6 +28,11 @@ const SERVICE_LABELS: Record<string, string> = {
   chain: 'Blockchain network',
   wallet: 'Agent wallet',
   subgraph: 'Payment history',
+  defiAgent: 'DeFi agent address',
+  paymentAgent: 'Payment agent address',
+  ownerKey: 'Kill switch key',
+  cronSecret: 'Scheduler secret',
+  smartAccount: 'Smart account address',
 }
 
 export default function StatusPage() {

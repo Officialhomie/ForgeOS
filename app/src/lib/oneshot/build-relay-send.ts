@@ -125,11 +125,14 @@ export function buildSend7710Params(opts: {
       feeAttached = true
     }
 
-    if (op.target && op.callData) {
+    if (op.target && (op.rawCalldata || op.callData)) {
+      // The relayer performs the redeemDelegations wrap from permissionContext;
+      // executions must carry the RAW action calldata. The pre-encoded
+      // redeemDelegations callData is rejected by relayer validation.
       executions.push({
         target: op.target,
         value: op.value ?? '0',
-        data: op.callData as Hex,
+        data: (op.rawCalldata ?? op.callData) as Hex,
       })
     }
 

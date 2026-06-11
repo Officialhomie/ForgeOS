@@ -8,8 +8,8 @@ export default function HomePage() {
         Forge<span className="text-forge-orange">OS</span>
       </h1>
       <p className="mt-4 max-w-md text-forge-text-muted">
-        Zero-knowledge agent operating system — MetaMask Smart Accounts, ERC-7710
-        delegations, Venice x402, and 1Shot relay.
+        The on-chain spending firewall for autonomous agents — MetaMask Smart
+        Accounts, ERC-7710 delegations, Venice x402, and 1Shot relay.
       </p>
       <div className="mt-8 flex gap-3">
         <Link href="/dashboard">

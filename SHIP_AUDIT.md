@@ -321,6 +321,42 @@ against the deployed Sepolia OSKernel. Verified on an anvil fork of live Sepolia
 To put the live revert evidence on Sepolia (user action — deployer keystore password required):
 run the two commands in the script header; record both tx hashes here.
 
+### Step 6 — Golden Path Hardening: automated portion COMPLETE (2026-06-10); 3× browser runs PENDING USER
+
+Automated pre-flight + off-path triage (production build, `next start`):
+
+- All nav routes return 200 with no error markers: `/`, `/activate`, `/dashboard`,
+  `/dashboard/{agents,delegations,subscriptions,treasury,status,builder}`, `/marketplace`,
+  `/marketplace/defi-rebalancer`, `/dashboard/agents/defi-rebalancer`. `/dashboard/settings`
+  is 404 but NO link to it exists anywhere in the app — not a reachable dead end.
+- Honest-failure checks over HTTP: `/api/execute` with zero-address target → 422
+  `action.target is missing or invalid`; with valid target but missing proofs → 422
+  `Missing delegation proof for hash 0x1111…`. Never a submitted UserOp.
+- Demo-mode adversarial check: `hydrateDemoStores` hard-blocks mock data in production builds
+  (`NODE_ENV === 'production'` guard) and `DashboardShell` shows a demo banner whenever
+  `NEXT_PUBLIC_DEMO_MODE=true`. Production build runs with it unset.
+- Balances: AgentTreasury 20 USDC (Sepolia); x402 wallet `0x85B0…9aFf` 5.3 USDC + 0.000248 ETH
+  (Base mainnet).
+- Readiness endpoint truthful: red on `FORGE_OWNER_KEY`, `FORGE_SMART_ACCOUNT_ADDRESS`
+  (user actions below) and subgraph.
+
+**Blocking user actions before the 3× golden-path runs (cannot be automated):**
+
+1. `cast wallet private-key --account deployer-onetruehomie` → set `FORGE_OWNER_KEY` in
+   `app/.env.local` (kill switch).
+2. Set `FORGE_SMART_ACCOUNT_ADDRESS=0xF34C3e41d3BFd03108d123aBe84E547d8DaDa6D1` (the
+   7702-upgraded demo account) in `app/.env.local`.
+3. Subgraph deployment `u1718317/s118960/latest` no longer exists at the configured Studio URL —
+   redeploy with `cd subgraph && npx graph auth <deploy-key> && npm run deploy:studio`, then
+   update `NEXT_PUBLIC_SUBGRAPH_URL`, or unset the URL so the UI uses its RPC-scan fallback.
+4. Run the FirewallMoment script (commands in `contracts/script/FirewallMoment.s.sol` header)
+   to put the live `CaveatWideningNotAllowed` revert + narrowing-accept tx hashes on Sepolia;
+   record the three tx hashes here.
+5. Perform the 3× clean golden-path runs per `DEMO_SCRIPT.md`; record timestamps + tx hashes
+   here. The FIRST successful step-4 execution also settles whether the (now fixed) relay path
+   redeems on-chain with enforcers in the trace — if both the success tx and a cap-exceeding
+   revert tx are captured, the conditional execution-time claim in `CLAIMS.md` may be unlocked.
+
 Note (documented, no redeploy per standing rules): OSKernel's `CaveatNarrowing` compares
 ERC20 amount terms in 64-byte `abi.encode(address,uint256)` form, while the MetaMask kit emits
 the enforcer's 52-byte packed form. OSKernel is the lifecycle/narrowing registry (creation-time

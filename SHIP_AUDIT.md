@@ -156,7 +156,7 @@ Per the ship prompt, Phase 2 requires a decision on whether to pursue live `rede
 
 | ID | Severity | File | Fix | Phase |
 |----|----------|------|-----|-------|
-| H1 | HIGH | `app/src/app/twitter-image.tsx:74` | Remove "zero-knowledge" claim | Phase 4 (Claims) |
+| H1 | HIGH | `app/src/app/twitter-image.tsx:74` | **FIXED 2026-06-10** — see Remediation Log | Phase 4 (Claims) |
 | H2 | HIGH | `app/src/lib/agents/templates.ts:50-55` | **FIXED 2026-06-10** — see Remediation Log | Phase 1 |
 | H3 | HIGH | `app/src/services/orchestrator/intent-parser.ts:181,198` | **FIXED 2026-06-10** — see Remediation Log | Phase 1 |
 | H4 | HIGH | `README.md:132-140` | Update implementation status table | Phase 4 |
@@ -236,3 +236,16 @@ Evidence — `npx -y tsx scripts/test-target-guard.ts` (all 7 checks pass):
 missing target → 422-class error; `0x` → rejected; zero address → rejected; `0x…0001`/`0x…0002`
 → rejected; `<TARGET_CONTRACT_ADDRESS>` → rejected; valid checksummed target (Sepolia USDC) → passes.
 `npx tsc --noEmit` and `pnpm build` clean.
+
+### H1 — FIXED (2026-06-10)
+
+All user/judge-facing "zero-knowledge" claims removed:
+
+- `app/src/app/twitter-image.tsx:74` → "Spending limits, cryptographically scoped permissions, zero-retention AI."
+- `src/app/page.tsx:11` (stale root scaffold, still in repo) → firewall framing
+- `src/app/layout.tsx:18` → "cryptographically scoped permissions" framing
+- `PRD.md` (3 occurrences) → "Zero-Retention Agent OS" framing
+
+Verification: `grep -rni "zero.knowledge"` over app source + top-level markdown returns hits only
+inside historical audit docs (`SHIP_AUDIT.md`, `FLOW_COVERAGE_REPORT.md`), which is permitted.
+No `\bZK\b`/`zk-` identifiers in app source. `pnpm build` clean.

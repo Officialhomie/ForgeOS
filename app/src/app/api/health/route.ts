@@ -33,6 +33,11 @@ export interface HealthResponse {
     chain: ServiceHealth
     wallet: ServiceHealth
     subgraph: ServiceHealth
+    defiAgent: ServiceHealth
+    paymentAgent: ServiceHealth
+    ownerKey: ServiceHealth
+    cronSecret: ServiceHealth
+    smartAccount: ServiceHealth
   }
   /** Overall end-to-end readiness — true only if all critical services are ok */
   ready: boolean
@@ -196,6 +201,18 @@ async function probeSubgraph(): Promise<ServiceHealth> {
   }
 }
 
+/**
+ * Presence-only check for a golden-path env var. Reports a boolean — the
+ * value itself (which may be a private key) is never included in the response.
+ */
+function probeEnvPresence(name: string, missingDetail: string): ServiceHealth {
+  const v = process.env[name]
+  if (v && v.trim() !== '') {
+    return { status: 'ok', latencyMs: null, detail: 'Configured' }
+  }
+  return { status: 'unconfigured', latencyMs: null, detail: missingDetail }
+}
+
 // ─── HANDLER ─────────────────────────────────────────────────────────────────
 
 export async function GET() {
@@ -208,15 +225,50 @@ export async function GET() {
 
   const wallet = probeWallet()
 
-  // subgraph + wallet config are non-blocking for dashboard UX
+  const defiAgent = probeEnvPresence(
+    'NEXT_PUBLIC_DEFI_AGENT_ADDRESS',
+    'Set NEXT_PUBLIC_DEFI_AGENT_ADDRESS — A2A sub-delegation chain cannot be created',
+  )
+  const paymentAgent = probeEnvPresence(
+    'NEXT_PUBLIC_PAYMENT_AGENT_ADDRESS',
+    'Set NEXT_PUBLIC_PAYMENT_AGENT_ADDRESS — A2A sub-delegation chain cannot be created',
+  )
+  const ownerKey = probeEnvPresence(
+    'FORGE_OWNER_KEY',
+    'Set FORGE_OWNER_KEY — kill switch (revoke/revokeAll) returns 503',
+  )
+  const cronSecret = probeEnvPresence(
+    'CRON_SECRET',
+    'Set CRON_SECRET — cron agent runner and delegation bundle upload are rejected',
+  )
+  const smartAccount = probeEnvPresence(
+    'FORGE_SMART_ACCOUNT_ADDRESS',
+    'Set FORGE_SMART_ACCOUNT_ADDRESS — agent runner cannot look up the delegation bundle',
+  )
+  const envChecks = [defiAgent, paymentAgent, ownerKey, cronSecret, smartAccount]
+
+  // subgraph + wallet config are non-blocking for dashboard UX;
+  // the five golden-path env vars ARE blocking for readiness.
   const critical = [venice, oneshot, chain]
-  const allOk = critical.every((s) => s.status === 'ok')
+  const allOk =
+    critical.every((s) => s.status === 'ok') && envChecks.every((s) => s.status === 'ok')
   const anyError = critical.some((s) => s.status === 'error')
 
   const body: HealthResponse = {
     ok: !anyError,
     timestamp: Math.floor(Date.now() / 1000),
-    services: { venice, oneshot, chain, wallet, subgraph },
+    services: {
+      venice,
+      oneshot,
+      chain,
+      wallet,
+      subgraph,
+      defiAgent,
+      paymentAgent,
+      ownerKey,
+      cronSecret,
+      smartAccount,
+    },
     ready: allOk,
   }
 

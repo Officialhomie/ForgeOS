@@ -16,6 +16,14 @@ import { slice } from 'viem'
 export interface UserOp {
   sender?: string
   callData: `0x${string}`
+  /**
+   * The raw action calldata (e.g. ERC20 transfer). The 1Shot relayer expects
+   * raw executions plus the delegation chain as permissionContext — it performs
+   * the redeemDelegations wrap itself. Sending `callData` (already
+   * redeemDelegations-encoded) is rejected pre-chain by relayer validation
+   * (verified 2026-06-10, see SHIP_AUDIT.md "Redeem Decision").
+   */
+  rawCalldata: `0x${string}`
   target: string
   value: string
   nonce: number
@@ -61,6 +69,7 @@ export function buildUserOps(opts: BuildUserOpsOptions): UserOp[] {
     return {
       sender: opts.senderAddress,
       callData,
+      rawCalldata: action.calldata,
       target: action.target,
       value: action.value.toString(),
       nonce: i,

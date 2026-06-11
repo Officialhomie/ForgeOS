@@ -9,6 +9,7 @@
  */
 
 import type { AgentId, AgentCategory } from '@/types'
+import { SEPOLIA_ENFORCERS } from '@/lib/contracts'
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -43,17 +44,10 @@ export interface AgentTemplate {
 }
 
 // ─── ENFORCER ADDRESSES (Sepolia) ─────────────────────────────────────────────
-// These are the MetaMask Delegation Toolkit caveat enforcer addresses.
-// Replace with actual deployed addresses for production.
+// MetaMask Delegation Framework caveat enforcers, deployed on Sepolia and
+// verified on-chain. Source of truth: SEPOLIA_ENFORCERS in @/lib/contracts.
 
-const ENFORCERS = {
-  erc20TransferAmount: '0x0000000000000000000000000000000000000001' as `0x${string}`,
-  allowedMethods: '0x0000000000000000000000000000000000000002' as `0x${string}`,
-  allowedTargets: '0x0000000000000000000000000000000000000003' as `0x${string}`,
-  limitedCalls: '0x0000000000000000000000000000000000000004' as `0x${string}`,
-  timestamp: '0x0000000000000000000000000000000000000005' as `0x${string}`,
-  blockNumber: '0x0000000000000000000000000000000000000006' as `0x${string}`,
-} as const
+const ENFORCERS = SEPOLIA_ENFORCERS
 
 // ─── TEMPLATES ────────────────────────────────────────────────────────────────
 

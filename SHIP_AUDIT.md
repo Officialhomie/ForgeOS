@@ -160,8 +160,8 @@ Per the ship prompt, Phase 2 requires a decision on whether to pursue live `rede
 | H2 | HIGH | `app/src/lib/agents/templates.ts:50-55` | **FIXED 2026-06-10** — see Remediation Log | Phase 1 |
 | H3 | HIGH | `app/src/services/orchestrator/intent-parser.ts:181,198` | **FIXED 2026-06-10** — see Remediation Log | Phase 1 |
 | H4 | HIGH | `README.md:132-140` | Update implementation status table | Phase 4 |
-| ENV1 | MEDIUM | `app/.env.example` | Add 5 missing env vars with comments | Phase 3 |
-| OC1 | MEDIUM | OSKernel on-chain owner | Verify owner == `FORGE_OWNER_KEY` wallet | Phase 3 pre-check |
+| ENV1 | MEDIUM | `app/.env.example` | **FIXED 2026-06-10** — see Remediation Log | Phase 3 |
+| OC1 | MEDIUM | OSKernel on-chain owner | **RESOLVED 2026-06-10** (one user action pending) — see Remediation Log | Phase 3 pre-check |
 | D1 | LOW | `lib/mock-data.ts` | Mock `confirmed` events have `source: 'local'` — acceptable, guarded | Accepted (dev-only) |
 | L1 | NONE | All API routes | Pending events use `source: 'local'` — correct semantics | No action |
 
@@ -249,3 +249,30 @@ All user/judge-facing "zero-knowledge" claims removed:
 Verification: `grep -rni "zero.knowledge"` over app source + top-level markdown returns hits only
 inside historical audit docs (`SHIP_AUDIT.md`, `FLOW_COVERAGE_REPORT.md`), which is permitted.
 No `\bZK\b`/`zk-` identifiers in app source. `pnpm build` clean.
+
+### ENV1 — FIXED (2026-06-10)
+
+All five missing env vars added to `app/.env.example` with comments explaining which
+golden-path step dies without each: `NEXT_PUBLIC_DEFI_AGENT_ADDRESS`,
+`NEXT_PUBLIC_PAYMENT_AGENT_ADDRESS`, `FORGE_OWNER_KEY`, `CRON_SECRET`,
+`FORGE_SMART_ACCOUNT_ADDRESS`.
+
+Readiness surface extended: `/api/health` now reports presence (boolean only — never key
+material) for each of the five, rendered on `/dashboard/status`, and `ready` is false unless
+all five are configured.
+
+Local `.env.local` state at time of fix: agent addresses + `CRON_SECRET` present;
+`FORGE_OWNER_KEY` and `FORGE_SMART_ACCOUNT_ADDRESS` still missing (see OC1).
+
+### OC1 — RESOLVED (2026-06-10), one user action pending
+
+- `cast call OSKernel "owner()(address)"` on Sepolia → `0x9aC2d5a0A0E88D459Ecfb68Bcbb94DFD7cdF1f09`
+- This is the team's deployer wallet (`deployer-onetruehomie` Foundry keystore per CHAINS.md) —
+  **NOT** Foundry's DefaultSender. The kill switch is not dead and no redeploy is needed.
+- `cast call OSKernel "revokeAll()(uint256)" --from 0x9aC2…1f09` → succeeds (returns 0)
+- `cast call … --from 0x…dEaD` → reverts `OwnableUnauthorizedAccount` (`0x118cdaa7`)
+
+**Pending user action (cannot be automated — keystore is password-protected):** export the
+deployer key and set it as `FORGE_OWNER_KEY` in `app/.env.local`:
+`cast wallet private-key --account deployer-onetruehomie` (prompts for password).
+Also set `FORGE_SMART_ACCOUNT_ADDRESS` to the demo smart account address.

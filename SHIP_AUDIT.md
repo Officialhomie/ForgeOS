@@ -159,7 +159,7 @@ Per the ship prompt, Phase 2 requires a decision on whether to pursue live `rede
 | H1 | HIGH | `app/src/app/twitter-image.tsx:74` | **FIXED 2026-06-10** — see Remediation Log | Phase 4 (Claims) |
 | H2 | HIGH | `app/src/lib/agents/templates.ts:50-55` | **FIXED 2026-06-10** — see Remediation Log | Phase 1 |
 | H3 | HIGH | `app/src/services/orchestrator/intent-parser.ts:181,198` | **FIXED 2026-06-10** — see Remediation Log | Phase 1 |
-| H4 | HIGH | `README.md:132-140` | Update implementation status table | Phase 4 |
+| H4 | HIGH | `README.md:132-140` | **FIXED 2026-06-10** — README rewritten (firewall thesis, honest status table, track mapping); CLAIMS.md + DEMO_SCRIPT.md created | Phase 4 |
 | ENV1 | MEDIUM | `app/.env.example` | **FIXED 2026-06-10** — see Remediation Log | Phase 3 |
 | OC1 | MEDIUM | OSKernel on-chain owner | **RESOLVED 2026-06-10** (one user action pending) — see Remediation Log | Phase 3 pre-check |
 | D1 | LOW | `lib/mock-data.ts` | Mock `confirmed` events have `source: 'local'` — acceptable, guarded | Accepted (dev-only) |

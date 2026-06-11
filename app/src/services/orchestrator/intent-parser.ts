@@ -31,6 +31,10 @@ RULES:
 - Hop 2 uses delegationChain: [rootHash, defiHash, reDelegate Hash]
 - ERC20 amounts are in USDC with 6 decimals (1 USDC = 1_000_000)
 - Never allow amounts exceeding hop limits (hop1: 500 USDC, hop2: 100 USDC)
+- The "target" field MUST be a real checksummed contract address taken from the
+  context provided to you (e.g. a token or recipient address in the user intent).
+  NEVER output the zero address, an example address, or the literal template
+  token below. If you cannot determine a real target address, OMIT that action.
 
 Respond ONLY with valid JSON:
 {
@@ -40,7 +44,7 @@ Respond ONLY with valid JSON:
       "id": "hop1",
       "type": "erc20_swap",
       "agentId": "defi-rebalancer",
-      "target": "0x0000000000000000000000000000000000000001",
+      "target": "<TARGET_CONTRACT_ADDRESS>",
       "calldata": "0x",
       "value": 0,
       "humanDescription": "<what DeFiAgent does>",
@@ -52,7 +56,7 @@ Respond ONLY with valid JSON:
       "id": "hop2",
       "type": "erc20_transfer",
       "agentId": "payment-executor",
-      "target": "0x0000000000000000000000000000000000000002",
+      "target": "<TARGET_CONTRACT_ADDRESS>",
       "calldata": "0x",
       "value": 50000000,
       "humanDescription": "<what PaymentAgent executes>",
@@ -178,7 +182,9 @@ function buildA2APlan(
         (a.agentId as AgentId) ??
         (isHop2 ? (expectedSecondaryAgent as AgentId) : (expectedPrimaryAgent as AgentId)),
       delegationChain,
-      target: (a.target as Address) ?? '0x0000000000000000000000000000000000000000',
+      // No zero-address fallback: a missing target stays visibly invalid ('0x')
+      // and is rejected by assertValidActionTarget before any UserOp is built.
+      target: (a.target ?? '0x') as Address,
       calldata: (a.calldata as `0x${string}`) ?? '0x',
       value: BigInt(a.value ?? 0),
       humanDescription: a.humanDescription ?? '',
@@ -195,7 +201,9 @@ function buildA2APlan(
       type: 'erc20_transfer',
       agentId: expectedSecondaryAgent as AgentId,
       delegationChain: [rootHash, defiHash, redelHash],
-      target: '0x0000000000000000000000000000000000000000',
+      // Deliberately invalid: the synthetic hop-2 has no real target, so it must
+      // fail target validation rather than be submitted to the zero address.
+      target: '0x' as Address,
       calldata: '0x',
       value: 0n,
       humanDescription: 'PaymentAgent executes final USDC transfer',

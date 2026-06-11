@@ -71,7 +71,7 @@ export default function TwitterImage() {
               lineHeight: 1.5,
             }}
           >
-            Spending limits, granular permissions, zero-knowledge control.
+            Spending limits, cryptographically scoped permissions, zero-retention AI.
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 36 }}>
             {['ERC-4337', 'Venice AI', 'x402'].map((tag) => (

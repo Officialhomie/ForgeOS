@@ -1,5 +1,5 @@
 # Product Requirements Document (PRD)
-**Product Name:** ForgeOS — No-Code Agent Marketplace + Zero-Knowledge Agent OS
+**Product Name:** ForgeOS — No-Code Agent Marketplace + Zero-Retention Agent OS
 **Version:** 1.1 (Updated for Implementation)
 **Date:** May 27, 2026
 **Hackathon:** MetaMask Smart Accounts Kit x 1Shot API x Venice AI Dev Cook Off
@@ -15,7 +15,7 @@
 ForgeOS is the first complete "App Store + iPhone" for autonomous on-chain agents.
 
 - **No-Code Agent Marketplace** (v1): Drag-and-drop builder where non-devs create, publish, and monetize fully functional AI agents pre-wired to the exact stack (MetaMask Smart Accounts Kit + ERC-7710/7715 + Venice AI + 1Shot + x402).
-- **Zero-Knowledge Agent OS** (v2 meta-product): A personal operating system that lives inside the user's MetaMask Smart Account. One master revocable delegation unlocks an ecosystem of sub-agents that collaborate privately, execute gaslessly, and self-fund via x402.
+- **Zero-Retention Agent OS** (v2 meta-product): A personal operating system that lives inside the user's MetaMask Smart Account. One master revocable delegation unlocks an ecosystem of sub-agents that run on zero-retention Venice AI inference, execute gaslessly, and self-fund via x402.
 
 **Why this wins:**
 The entire stack is live and production-proven in 2026 (verified via official MetaMask docs, Venice API, 1Shot public relayer, ERC-7710/7715 reference implementations, and native x402 support). No custom infrastructure needed. Every agent is:
@@ -121,7 +121,7 @@ ForgeOS turns every MetaMask Smart Account into a self-sustaining, privacy-first
 - Install = one ERC-7715 approval reusing agent's caveat template
 - Creator earnings visible on-chain
 
-### Phase 2 — Zero-Knowledge Agent OS
+### Phase 2 — Zero-Retention Agent OS
 
 **OS Kernel** = User's MetaMask Smart Account (activated once via the 4-step wizard)
 

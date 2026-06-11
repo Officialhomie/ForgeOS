@@ -276,3 +276,53 @@ Local `.env.local` state at time of fix: agent addresses + `CRON_SECRET` present
 deployer key and set it as `FORGE_OWNER_KEY` in `app/.env.local`:
 `cast wallet private-key --account deployer-onetruehomie` (prompts for password).
 Also set `FORGE_SMART_ACCOUNT_ADDRESS` to the demo smart account address.
+
+### Redeem Decision — FINAL (2026-06-10)
+
+**Decision: execution-time caveat-enforcer enforcement is NOT demonstrably live. The claims
+branch is the conservative (fallback) one: creation-time narrowing + treasury-level bounds are
+the on-chain centerpiece. Do not claim "caveats are enforced on-chain at execution time" unless
+the golden-path runs (Step 6) later produce the two trace tx hashes.**
+
+Probe method (no prior execution existed to trace — OSKernel has ZERO transactions on Sepolia
+since deploy, and the 1Shot relay target `0x02c9979a75fbdbc3a77485024ab8b6474308591e` has no
+code and no tx history): `app/scripts/redeem-trace-probe.ts` built ONE execution through the
+real pipeline (`createRootDelegationStruct` → EIP-712-signed delegation (DeFi agent key, real
+signature against DelegationManager `0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3` domain) →
+`buildUserOps` → `buildSend7710Params` → `relayer_send7710Transaction`).
+
+Findings:
+
+1. **As previously wired, the pipeline could NEVER reach the chain.** The relayer rejected the
+   submission pre-chain: `Invalid call data for ERC20 payment: 0x67e3d4c6…`
+   (`ValidationError`). `0x67e3d4c6` is the app's `redeemDelegations` encoding —
+   `userop-builder.ts` pre-encoded `redeemDelegations` into the execution data while ALSO
+   passing the delegation chain as `permissionContext`. This is the audit §8 "relay rewraps the
+   calldata" branch, now empirically confirmed: the 1Shot relayer expects RAW executions and
+   performs the ERC-7710 redemption wrap itself.
+2. **With raw calldata the relayer ACCEPTS the submission** (taskId
+   `0x65cf07aba0f53ee2e55ae6317a303ca8959b41fc05f58a7c9d0b9e28ff2eab56` returned). No on-chain
+   tx resulted — correct relayer behavior, since the probe delegator (DeFi agent EOA) has no
+   DeleGator code and no USDC, so the relayer's redemption simulation fails. A successful
+   on-chain redemption requires the real demo account `0xF34C3e41d3BFd03108d123aBe84E547d8DaDa6D1`
+   (verified EIP-7702-delegated to MetaMask `EIP7702StatelessDeleGator`
+   `0x63c0c19a282a1b52b07dd5a65b58948a07dae32b`, holds 10 USDC) whose key only the user's
+   MetaMask holds — first golden-path run will settle it.
+3. **Fix applied** (required for golden-path steps 4–5 to function at all): `UserOp.rawCalldata`
+   added; `build-relay-send.ts` now sends raw action calldata in `executions`. The
+   `redeemDelegations` encoding remains as proof-integrity validation. Other relay routes
+   (`/api/relay/redelegate`, `/api/relay/fund`) already sent raw calldata and were unaffected.
+
+**Fallback centerpiece prepared and verified:** `contracts/script/FirewallMoment.s.sol` runs
+against the deployed Sepolia OSKernel. Verified on an anvil fork of live Sepolia state:
+- root delegation (500 USDC cap) registers; narrowing redelegation (100 USDC) accepted;
+- widening redelegation (1000 USDC) reverts
+  `CaveatWideningNotAllowed(0xf100b0819427117EcF76Ed94B358B1A5b5C6D2Fc, "amount exceeds parent")`.
+To put the live revert evidence on Sepolia (user action — deployer keystore password required):
+run the two commands in the script header; record both tx hashes here.
+
+Note (documented, no redeploy per standing rules): OSKernel's `CaveatNarrowing` compares
+ERC20 amount terms in 64-byte `abi.encode(address,uint256)` form, while the MetaMask kit emits
+the enforcer's 52-byte packed form. OSKernel is the lifecycle/narrowing registry (creation-time
+validation); the enforcer contracts read the packed form at execution time. The two layers are
+separate and both internally consistent; claims must not conflate them.

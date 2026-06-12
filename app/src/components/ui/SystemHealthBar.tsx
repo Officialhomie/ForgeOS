@@ -51,7 +51,7 @@ function ServiceDot({ name, health }: { name: string; health: ServiceHealth }) {
  * Polls every 30s. Drop into any layout that should surface system status.
  */
 export function SystemHealthBar({ className = '' }: { className?: string }) {
-  const { health, loading, refresh } = useSystemHealth()
+  const { health, loading, error, refresh } = useSystemHealth()
 
   if (loading && !health) {
     return (
@@ -62,12 +62,30 @@ export function SystemHealthBar({ className = '' }: { className?: string }) {
     )
   }
 
-  if (!health) return null
+  if (!health) {
+    if (error) {
+      return (
+        <p className={`text-xs text-red-400 ${className}`}>
+          Could not check services — {error}
+        </p>
+      )
+    }
+    return null
+  }
 
-  const { services } = health
+  const { services, ready } = health
 
   return (
     <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 ${className}`}>
+      <span
+        className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+          ready
+            ? 'bg-green-500/10 text-green-400'
+            : 'bg-amber-500/10 text-amber-300'
+        }`}
+      >
+        {ready ? 'Ready' : 'Setup needed'}
+      </span>
       <ServiceDot name="AI service" health={services.venice} />
       <ServiceDot name="Transaction relay" health={services.oneshot} />
       <ServiceDot name="Network" health={services.chain} />

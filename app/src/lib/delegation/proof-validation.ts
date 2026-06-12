@@ -34,7 +34,7 @@ export function assertValidActionTarget(action: PlannedAction): void {
   const target = typeof action.target === 'string' ? action.target.toLowerCase() : ''
   if (!/^0x[0-9a-f]{40}$/.test(target) || FORBIDDEN_TARGETS.has(target)) {
     throw new DelegationProofError(
-      `action.target is missing or invalid (action "${action.id}", target "${action.target ?? ''}")`,
+      `This action has no valid destination address — check the plan and try again (action "${action.id}")`,
     )
   }
 }

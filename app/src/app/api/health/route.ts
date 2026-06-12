@@ -227,23 +227,23 @@ export async function GET() {
 
   const defiAgent = probeEnvPresence(
     'NEXT_PUBLIC_DEFI_AGENT_ADDRESS',
-    'Set NEXT_PUBLIC_DEFI_AGENT_ADDRESS — A2A sub-delegation chain cannot be created',
+    'Add the DeFi agent wallet address to your env file so agents can share permissions',
   )
   const paymentAgent = probeEnvPresence(
     'NEXT_PUBLIC_PAYMENT_AGENT_ADDRESS',
-    'Set NEXT_PUBLIC_PAYMENT_AGENT_ADDRESS — A2A sub-delegation chain cannot be created',
+    'Add the payment agent wallet address to your env file so agents can share permissions',
   )
   const ownerKey = probeEnvPresence(
     'FORGE_OWNER_KEY',
-    'Set FORGE_OWNER_KEY — kill switch (revoke/revokeAll) returns 503',
+    'Add the owner wallet key to your env file so the stop-all-agents button works',
   )
   const cronSecret = probeEnvPresence(
     'CRON_SECRET',
-    'Set CRON_SECRET — cron agent runner and delegation bundle upload are rejected',
+    'Add a scheduler secret to your env file so background agent runs are allowed',
   )
   const smartAccount = probeEnvPresence(
     'FORGE_SMART_ACCOUNT_ADDRESS',
-    'Set FORGE_SMART_ACCOUNT_ADDRESS — agent runner cannot look up the delegation bundle',
+    'Add your upgraded wallet address to your env file so scheduled agents can run',
   )
   const envChecks = [defiAgent, paymentAgent, ownerKey, cronSecret, smartAccount]
 

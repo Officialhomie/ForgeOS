@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount, useDisconnect, useChainId, useSwitchChain, useWalletClient } from 'wagmi'
-import { createClient, createPublicClient, custom, http, parseAbi, parseUnits } from 'viem'
+import { createClient, custom } from 'viem'
+import { parseUnits } from 'viem'
 import { useForgeWalletConnect } from '@/hooks/useForgeWalletConnect'
 import { erc7715ProviderActions } from '@metamask/smart-accounts-kit/actions'
 import { CONTRACTS } from '@/lib/contracts'
@@ -39,16 +40,9 @@ import type {
 import { ACTIVATION_CHAIN_ID } from '@/types/activation'
 import type { Address, Hash, OSKernelConfig } from '@/types'
 import {
-  formatTreasuryPreflightError,
-  preflightTreasuryFunding,
-} from '@/lib/treasury/validate-funding'
-
-const erc20Abi = parseAbi([
-  'function approve(address spender, uint256 amount) returns (bool)',
-  'function balanceOf(address account) view returns (uint256)',
-])
-
-const treasuryAbi = parseAbi(['function fund(uint256 amount)'])
+  formatWalletFundingError,
+  fundTreasuryFromWallet,
+} from '@/lib/treasury/fund-from-wallet'
 
 const STEP_ORDER: ActivationStepId[] = [
   'connect',
@@ -485,97 +479,21 @@ export function useActivation() {
     fundAbortRef.current = abort
 
     try {
-      const isTransportTimeout = (err: unknown): boolean => {
-        const message = err instanceof Error ? err.message : String(err)
-        return /transport request timed out|rpcerr53|timeout/i.test(message)
-      }
-
       if (!address) throw new Error('Connect wallet first')
       if (chainId !== ACTIVATION_CHAIN_ID) {
         await ensureForgeChain(switchChainAsync)
       }
 
       const amountRaw = parseUnits(fundAmountUsdc, 6)
-      if (amountRaw <= 0n) throw new Error('Enter a USDC amount greater than 0')
-
       if (!connectedWalletClient) throw new Error('MetaMask wallet client unavailable')
-      const walletChainBefore = connectedWalletClient.chain?.id ?? null
-      if (walletChainBefore !== ACTIVATION_CHAIN_ID) {
-        throw new Error(
-          `Wallet network is ${walletChainBefore ?? 'unknown'}. Switch MetaMask to Sepolia (${ACTIVATION_CHAIN_ID}) and retry funding.`,
-        )
-      }
-      const walletClient = connectedWalletClient
-      const retryWriteContract = async (
-        request: Parameters<typeof walletClient.writeContract>[0],
-        label: 'approve' | 'fund',
-      ) => {
-        try {
-          return await walletClient.writeContract(request)
-        } catch (err) {
-          if (!isTransportTimeout(err)) throw err
-          await new Promise((resolve) => setTimeout(resolve, 1500))
-          try {
-            return await walletClient.writeContract(request)
-          } catch (retryErr) {
-            if (!isTransportTimeout(retryErr)) throw retryErr
-            throw new Error(
-              `Sepolia RPC timed out during ${label}. Retry in a few seconds, or switch MetaMask Sepolia RPC to a faster endpoint (for example Infura/Alchemy) and try again.`,
-            )
-          }
-        }
-      }
-      const publicClient = createPublicClient({
-        chain: forgeChain,
-        transport: http(forgeChain.rpcUrls.default.http[0]),
-      })
 
-      const preflight = await preflightTreasuryFunding(publicClient, {
-        treasuryAddress: CONTRACTS.agentTreasury,
-        configuredUsdc: CONTRACTS.usdc,
+      const fundHash = await fundTreasuryFromWallet({
+        walletClient: connectedWalletClient,
         funder: address,
-        amount: amountRaw,
+        amountRaw,
+        amountUsdcLabel: fundAmountUsdc,
+        signal: abort.signal,
       })
-      if (!preflight.fundSimulationOk) {
-        throw new Error(formatTreasuryPreflightError(preflight, fundAmountUsdc))
-      }
-
-      const fundingUsdc = preflight.treasuryUsdc
-      if (preflight.allowance < amountRaw) {
-        const approveHash = await retryWriteContract(
-          {
-            address: fundingUsdc,
-            abi: erc20Abi,
-            functionName: 'approve',
-            args: [CONTRACTS.agentTreasury, amountRaw],
-            chain: forgeChain,
-            account: address,
-          },
-          'approve',
-        )
-        await publicClient.waitForTransactionReceipt({ hash: approveHash })
-      }
-
-      if (abort.signal.aborted) {
-        throw new Error('Funding cancelled')
-      }
-
-      const fundHash = await retryWriteContract(
-        {
-          address: CONTRACTS.agentTreasury,
-          abi: treasuryAbi,
-          functionName: 'fund',
-          args: [amountRaw],
-          chain: forgeChain,
-          account: address,
-        },
-        'fund',
-      )
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: fundHash })
-
-      if (receipt.status !== 'success') {
-        throw new Error('Treasury funding transaction reverted on-chain')
-      }
 
       finishActivation(fundHash)
     } catch (e) {
@@ -584,13 +502,6 @@ export function useActivation() {
         return
       }
       const message = e instanceof Error ? e.message : String(e)
-      if (/user denied transaction signature/i.test(message)) {
-        patch({ phase: 'error' })
-        setError(
-          'Funding needs 2 MetaMask confirmations (approve + fund). The second fund signature was rejected, so no treasury deposit was sent.',
-        )
-        return
-      }
       if (/Wallet network is \d+/.test(message)) {
         patch({ phase: 'idle' })
         setError(message)
@@ -602,7 +513,7 @@ export function useActivation() {
         return
       }
       patch({ phase: 'error' })
-      setError(e instanceof Error ? e.message : 'Treasury funding failed')
+      setError(formatWalletFundingError(e))
     } finally {
       if (fundAbortRef.current === abort) {
         fundAbortRef.current = null

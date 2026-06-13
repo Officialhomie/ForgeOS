@@ -29,6 +29,9 @@ export function ActivationGuard({ children }: { children: ReactNode }) {
   const setOsStatus = useOsStore((s) => s.setOsStatus)
   const [resolved, setResolved] = useState(false)
   const [active, setActive] = useState(false)
+  const [blockReason, setBlockReason] = useState<'checking' | 'no_wallet' | 'setup_incomplete'>(
+    'checking',
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -43,11 +46,14 @@ export function ActivationGuard({ children }: { children: ReactNode }) {
       // No wallet connected — always redirect.
       if (!isConnected || !address) {
         if (!cancelled) {
+          setBlockReason('no_wallet')
           setActive(false)
           setResolved(true)
         }
         return
       }
+
+      setBlockReason('checking')
 
       const store = useActivationStore.getState()
       const walletState = store.getWallet(address)
@@ -87,6 +93,7 @@ export function ActivationGuard({ children }: { children: ReactNode }) {
 
       setOsStatus('inactive')
       if (!cancelled) {
+        setBlockReason('setup_incomplete')
         setActive(false)
         setResolved(true)
       }
@@ -104,15 +111,28 @@ export function ActivationGuard({ children }: { children: ReactNode }) {
   }, [active, resolved, router])
 
   if (!resolved || !active) {
+    const message =
+      blockReason === 'no_wallet'
+        ? 'Connect your wallet to continue…'
+        : blockReason === 'setup_incomplete'
+          ? 'Finish activation to open the dashboard…'
+          : 'Checking your account…'
+
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-sm text-forge-text-muted">
         <div className="flex items-center gap-2">
           <span className="inline-block size-4 animate-spin rounded-full border-2 border-forge-border border-t-forge-orange" />
-          Checking your account…
+          {message}
         </div>
         {address && (
           <p className="font-mono text-xs text-forge-text-subtle">
             {address.slice(0, 6)}…{address.slice(-4)}
+          </p>
+        )}
+        {blockReason === 'setup_incomplete' && (
+          <p className="max-w-sm text-center text-xs text-forge-text-subtle">
+            You need agent permissions and funds in your spending pool. We&apos;re sending you to
+            the setup wizard.
           </p>
         )}
       </div>

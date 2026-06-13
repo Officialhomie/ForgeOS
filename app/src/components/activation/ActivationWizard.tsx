@@ -2,6 +2,7 @@
 
 import type { ComponentType } from 'react'
 import { ActivationProgress } from '@/components/activation/ActivationProgress'
+import { ActivationFundingBanner } from '@/components/activation/ActivationFundingBanner'
 import { StepFour_Confirm } from '@/components/activation/StepFour_Confirm'
 import { StepOne_Connect } from '@/components/activation/StepOne_Connect'
 import { StepThree_Delegate } from '@/components/activation/StepThree_Delegate'
@@ -70,6 +71,8 @@ function ActivationWizardInner() {
         </div>
 
         <ActivationProgress steps={steps} percent={progressPercent} />
+
+        <ActivationFundingBanner />
 
         <div className="mt-8">
           <ActiveStep />

@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { useAccount, useChainId, useSwitchChain, useWalletClient } from 'wagmi'
+import { parseUnits } from 'viem'
 import { Button } from '@/components/ui/Button'
 import {
   Card,
@@ -9,8 +11,12 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { CONTRACTS } from '@/lib/contracts'
-import { ONESHOT } from '@/lib/constants'
+import { ACTIVATION_CHAIN_ID } from '@/types/activation'
+import { ensureForgeChain } from '@/lib/wagmi/ensure-forge-chain'
+import {
+  formatWalletFundingError,
+  fundTreasuryFromWallet,
+} from '@/lib/treasury/fund-from-wallet'
 import { Coins, X } from 'lucide-react'
 
 export function TopUpModal({
@@ -25,6 +31,10 @@ export function TopUpModal({
   const [amount, setAmount] = useState('25')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { address, isConnected } = useAccount()
+  const chainId = useChainId()
+  const { switchChainAsync } = useSwitchChain()
+  const { data: walletClient } = useWalletClient()
 
   if (!open) return null
 
@@ -32,21 +42,28 @@ export function TopUpModal({
     setBusy(true)
     setError(null)
     try {
-      const res = await fetch('/api/relay/fund', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chainId: ONESHOT.CHAIN_ID,
-          amountUsdc: amount,
-          treasuryAddress: CONTRACTS.agentTreasury,
-        }),
+      if (!isConnected || !address) {
+        throw new Error('Connect your wallet before adding funds')
+      }
+      if (!walletClient) {
+        throw new Error('MetaMask wallet client unavailable')
+      }
+      if (chainId !== ACTIVATION_CHAIN_ID) {
+        await ensureForgeChain(switchChainAsync)
+      }
+
+      const amountRaw = parseUnits(amount, 6)
+      await fundTreasuryFromWallet({
+        walletClient,
+        funder: address,
+        amountRaw,
+        amountUsdcLabel: amount,
       })
-      const data = (await res.json()) as { error?: string }
-      if (!res.ok) throw new Error(data.error ?? 'Fund failed')
+
       onSuccess?.()
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fund failed')
+      setError(formatWalletFundingError(e))
     } finally {
       setBusy(false)
     }
@@ -74,12 +91,14 @@ export function TopUpModal({
           </div>
           <CardTitle id="topup-title">Add funds</CardTitle>
           <CardDescription>
-            Move USDC into your agents&apos; spending pool so they can pay for tasks.
+            Move USDC from your wallet into your agents&apos; spending pool. MetaMask will ask
+            you to approve USDC, then confirm the deposit.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="rounded-lg border border-forge-info/30 bg-forge-info/10 px-3 py-2 text-xs text-forge-text-muted">
-            On testnet, you may need free test USDC from a faucet before adding funds here.
+            On Sepolia testnet, you need Circle test USDC in your wallet first. This uses the
+            same flow as activation step 4 — not a server relay.
           </p>
           <label className="block space-y-1">
             <span className="text-xs text-forge-text-muted">USDC amount</span>
@@ -96,8 +115,8 @@ export function TopUpModal({
             <Button variant="outline" onClick={onClose} disabled={busy}>
               Cancel
             </Button>
-            <Button onClick={() => void handleFund()} disabled={busy}>
-              {busy ? 'Submitting…' : 'Add funds'}
+            <Button onClick={() => void handleFund()} disabled={busy || !isConnected}>
+              {busy ? 'Confirm in MetaMask…' : 'Add funds'}
             </Button>
           </div>
         </CardContent>

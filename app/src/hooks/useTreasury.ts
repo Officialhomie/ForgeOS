@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useAccount } from 'wagmi'
 import { ONESHOT } from '@/lib/constants'
 import { CONTRACTS } from '@/lib/contracts'
 import { GRAPH_POLL_MS, isGraphEnabled } from '@/lib/graph/config'
@@ -14,7 +15,8 @@ import {
 } from '@/lib/graph/mappers'
 import { GET_DAILY_PAYMENTS, GET_TREASURY_SUMMARY } from '@/lib/graph/queries'
 import type { GraphTreasuryEvent, GraphTreasuryState } from '@/lib/graph/types'
-import { readTreasuryBalance } from '@/lib/treasury/onchain'
+import type { Address } from '@/types'
+import { readTreasuryBalance, readUserTreasuryBalance } from '@/lib/treasury/onchain'
 import { useTreasuryStore } from '@/stores/treasury.store'
 import type { TreasuryState } from '@/types'
 
@@ -36,6 +38,7 @@ export function useTreasury(): {
   refetch: () => void
   topUp: (amountUsdc: string) => Promise<{ taskId: string }>
 } {
+  const { address, isConnected } = useAccount()
   const treasury = useTreasuryStore((s) => s.treasury)
   const loading = useTreasuryStore((s) => s.loading)
   const setTreasury = useTreasuryStore((s) => s.setTreasury)
@@ -50,8 +53,11 @@ export function useTreasury(): {
   const graphOn = isGraphEnabled()
 
   const fetchLive = useCallback(async () => {
-    // Always read the live on-chain balance — works even while the subgraph syncs
-    const liveBalance = await readTreasuryBalance()
+    const [liveBalance, userBalance] = await Promise.all([
+      readTreasuryBalance(),
+      isConnected && address ? readUserTreasuryBalance(address as Address) : Promise.resolve(null),
+    ])
+    const displayBalance = userBalance ?? liveBalance
 
     // Subgraph queries may fail while the indexer is initializing — treat as non-fatal
     const since = String(Math.floor(Date.now() / 1000) - 30 * 86400)
@@ -69,7 +75,7 @@ export function useTreasury(): {
       {
         chainId: ONESHOT.CHAIN_ID,
         treasuryAddress: CONTRACTS.agentTreasury,
-        liveBalance,
+        liveBalance: displayBalance,
         monthlyCap: 500_000_000n,
       },
     )
@@ -79,7 +85,7 @@ export function useTreasury(): {
     setDailySpend(aggregateDailyPayments(daily?.treasuryEvents ?? []))
     queueMicrotask(() => setError(null))
     return mapped   // React Query v5 requires a non-undefined return value
-  }, [setTreasury])
+  }, [setTreasury, address, isConnected])
 
   const query = useQuery({
     queryKey: ['treasury', 'graph'],

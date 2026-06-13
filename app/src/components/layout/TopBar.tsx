@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { NetworkIndicator } from '@/components/ui/NetworkIndicator'
 import { KillSwitchModal } from '@/components/KillSwitchModal'
 import { useCommandStore } from '@/stores/command.store'
+import { SpendingPoolBadge } from '@/components/ui/SpendingPoolBadge'
 import { Menu } from 'lucide-react'
 
 export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
@@ -49,6 +50,7 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
           </Button>
           {isConnected && address ? (
             <>
+              <SpendingPoolBadge />
               <AddressDisplay address={address} />
               <Button variant="ghost" onClick={() => disconnect()}>
                 Disconnect
